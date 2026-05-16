@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>BotBuilder</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#1c1c1e;--bg2:#2c2c2e;--bg3:#3a3a3c;--txt:#fff;--hint:#8e8e93;--accent:#0a84ff;--ok:#34c759;--warn:#ff9f0a;--err:#ff3b30;--r:14px}
+body{background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:16px;min-height:100vh;overflow-x:hidden}
+.screen{display:none;padding:16px 16px 80px}
+.screen.active{display:block}
+#loading{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;gap:16px}
+.logo{font-size:64px}
+.app-title{font-size:28px;font-weight:700}
+.spinner{width:36px;height:36px;border:3px solid rgba(255,255,255,.1);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+.hdr-left h1{font-size:22px;font-weight:700}
+.hdr-left p{font-size:13px;color:var(--hint);margin-top:2px}
+.icon-btn{background:var(--bg2);border:none;color:var(--txt);width:36px;height:36px;border-radius:10px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.bot-card{background:var(--bg2);border-radius:var(--r);padding:16px;margin-bottom:10px;cursor:pointer;transition:opacity .15s}
+.bot-card:active{opacity:.7}
+.bot-card-row{display:flex;align-items:center;justify-content:space-between}
+.bot-name{font-size:17px;font-weight:600}
+.bot-desc{font-size:13px;color:var(--hint);margin-top:3px}
+.badge{padding:4px 10px;border-radius:20px;font-size:12px;font-weight:600}
+.badge-active{background:rgba(52,199,89,.15);color:var(--ok)}
+.badge-inactive{background:rgba(142,142,147,.15);color:var(--hint)}
+.empty{text-align:center;padding:60px 20px}
+.empty-ico{font-size:60px;margin-bottom:16px}
+.empty-ttl{font-size:20px;font-weight:600;margin-bottom:8px}
+.empty-sub{color:var(--hint);font-size:15px}
+.fab{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--accent);color:#fff;border:none;border-radius:var(--r);padding:14px;font-size:16px;font-weight:600;cursor:pointer;width:calc(100% - 32px);max-width:420px;box-shadow:0 4px 20px rgba(10,132,255,.4)}
+.overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:var(--bg);z-index:200;overflow-y:auto;display:none}
+.ovl-hdr{display:flex;align-items:center;padding:16px;border-bottom:1px solid rgba(255,255,255,.08);position:sticky;top:0;background:var(--bg);z-index:1}
+.close-btn{background:none;border:none;color:var(--hint);font-size:22px;cursor:pointer;padding:0 12px 0 0;line-height:1}
+.ovl-title{font-size:18px;font-weight:700}
+.ovl-body{padding:20px 16px 40px}
+.steps{display:flex;gap:6px;margin-bottom:24px}
+.step-dot{height:4px;border-radius:2px;flex:1;background:rgba(255,255,255,.12);transition:background .3s}
+.step-dot.active{background:var(--accent)}
+.step-dot.done{background:var(--ok)}
+.form-grp{margin-bottom:18px}
+.form-lbl{font-size:12px;font-weight:600;color:var(--hint);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;display:block}
+.form-inp{width:100%;background:var(--bg2);border:1.5px solid rgba(255,255,255,.1);border-radius:12px;padding:13px 14px;color:var(--txt);font-size:16px;outline:none;transition:border-color .2s;font-family:inherit}
+.form-inp:focus{border-color:var(--accent)}
+textarea.form-inp{min-height:110px;resize:vertical}
+.form-hint{font-size:12px;color:var(--hint);margin-top:5px}
+.row{display:flex;gap:8px}
+.row .form-inp{flex:1}
+.verify-btn{background:var(--bg2);border:1.5px solid rgba(255,255,255,.1);border-radius:12px;color:var(--accent);padding:13px 14px;font-size:14px;font-weight:600;cursor:pointer;white-space:nowrap}
+.verify-btn:disabled{opacity:.5}
+.msg{border-radius:12px;padding:12px 14px;font-size:14px;margin-bottom:14px}
+.msg-ok{background:rgba(52,199,89,.12);color:var(--ok)}
+.msg-err{background:rgba(255,59,48,.12);color:var(--err)}
+.msg-info{background:rgba(10,132,255,.12);color:var(--accent)}
+.nav{display:flex;gap:10px;margin-top:20px}
+.btn-sec{flex:1;background:var(--bg2);color:var(--txt);border:1.5px solid rgba(255,255,255,.1);border-radius:var(--r);padding:13px;font-size:16px;font-weight:600;cursor:pointer}
+.btn-pri{flex:2;background:var(--accent);color:#fff;border:none;border-radius:var(--r);padding:13px;font-size:16px;font-weight:600;cursor:pointer}
+.btn-pri:disabled{opacity:.5}
+.yaml-pre{background:var(--bg2);border-radius:12px;padding:14px;font-family:'SF Mono',monospace;font-size:11px;line-height:1.6;color:#a8d8a8;white-space:pre-wrap;max-height:260px;overflow-y:auto;margin-bottom:14px}
+.back-nav{background:none;border:none;color:var(--accent);font-size:15px;cursor:pointer;padding:0 0 4px;display:flex;align-items:center;gap:6px}
+.det-hdr{background:var(--bg2);border-radius:var(--r);padding:18px;margin-bottom:16px}
+.det-name{font-size:22px;font-weight:700}
+.det-tok{font-size:12px;color:var(--hint);margin-top:4px;font-family:monospace}
+.det-status{margin-top:8px}
+.action-row{display:flex;gap:10px;margin-bottom:14px}
+.act-btn{flex:1;border-radius:var(--r);padding:13px;font-size:15px;font-weight:600;border:none;cursor:pointer}
+.act-start{background:rgba(52,199,89,.12);color:var(--ok)}
+.act-stop{background:rgba(255,59,48,.12);color:var(--err)}
+.sec-ttl{font-size:12px;font-weight:600;color:var(--hint);text-transform:uppercase;letter-spacing:.5px;margin:18px 0 8px}
+.flows-box{background:var(--bg2);border-radius:var(--r);overflow:hidden}
+.flow-row{display:flex;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06)}
+.flow-row:last-child{border-bottom:none}
+.flow-ico{width:30px;height:30px;background:rgba(10,132,255,.12);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0}
+.flow-nm{font-size:15px;font-weight:500}
+.flow-tp{font-size:12px;color:var(--hint)}
+.del-btn{background:rgba(255,59,48,.1);color:var(--err);border:none;border-radius:var(--r);padding:13px;font-size:15px;font-weight:600;cursor:pointer;width:100%;margin-top:6px}
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <div class="logo">&#129302;</div>
+  <div class="app-title">BotBuilder</div>
+  <div class="spinner"></div>
+</div>
+
+<div id="dashboard" class="screen">
+  <div class="hdr">
+    <div class="hdr-left"><h1>My Bots</h1><p id="greeting">Loading...</p></div>
+    <button class="icon-btn" onclick="openSettings()" title="Settings">&#9881;</button>
+  </div>
+  <div id="bots-list"></div>
+  <button class="fab" onclick="openWizard()">+ Create New Bot</button>
+</div>
+
+<div id="detail" class="screen">
+  <button class="back-nav" onclick="showDash()">&#8592; Back</button>
+  <div id="det-content"></div>
+</div>
+
+<div id="settings" class="screen">
+  <button class="back-nav" onclick="showDash()">&#8592; Back</button>
+  <div id="set-content"></div>
+</div>
+
+<div id="wizard" class="overlay">
+  <div class="ovl-hdr">
+    <button class="close-btn" onclick="closeWizard()">&#10005;</button>
+    <div class="ovl-title" id="wiz-title">Create Bot</div>
+  </div>
+  <div class="ovl-body">
+    <div class="steps">
+      <div class="step-dot" id="d1"></div>
+      <div class="step-dot" id="d2"></div>
+      <div class="step-dot" id="d3"></div>
+    </div>
+
+    <div id="s1">
+      <div class="form-grp">
+        <label class="form-lbl">Bot Token from @BotFather</label>
+        <div class="row">
+          <input class="form-inp" id="inp-token" type="text" placeholder="1234567890:ABC..." autocomplete="off" spellcheck="false">
+          <button class="verify-btn" id="vfy-btn" onclick="verifyToken()">Verify</button>
+        </div>
+        <div class="form-hint">Get token from @BotFather — /newbot command</div>
+      </div>
+      <div id="tok-msg"></div>
+    </div>
+
+    <div id="s2" style="display:none">
+      <div class="form-grp">
+        <label class="form-lbl">What should your bot do?</label>
+        <textarea class="form-inp" id="inp-desc" placeholder="Describe your bot in detail...&#10;&#10;Example: FAQ bot for our restaurant. Answers about menu, opening hours, reservations. Also takes food orders."></textarea>
+        <div class="form-hint">More detail = better result</div>
+      </div>
+      <div class="form-grp">
+        <label class="form-lbl">Anthropic API Key (for AI generation)</label>
+        <input class="form-inp" id="inp-key" type="password" placeholder="sk-ant-..." autocomplete="new-password">
+        <div class="form-hint">Optional. Without it — a ready-made template is used</div>
+      </div>
+    </div>
+
+    <div id="s3" style="display:none">
+      <div class="form-grp">
+        <label class="form-lbl">Bot Name</label>
+        <input class="form-inp" id="inp-name" type="text" placeholder="My Bot">
+      </div>
+      <div class="form-grp">
+        <label class="form-lbl">Bot Definition (YAML)</label>
+        <pre class="yaml-pre" id="yaml-out">Generating...</pre>
+      </div>
+      <div id="cr-msg"></div>
+    </div>
+
+    <div class="nav" id="wiz-nav">
+      <button class="btn-sec" id="prev-btn" style="display:none" onclick="wPrev()">Back</button>
+      <button class="btn-pri" id="next-btn" onclick="wNext()">Next &#8594;</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const tg = window.Telegram && window.Telegram.WebApp;
+const API = location.origin;
+let U = null, BOTS = [], WIZ = {step:1, token:'', info:null, desc:'', key:'', yaml:'', name:''};
+
+if(tg){tg.ready();tg.expand();var th=tg.themeParams||{};
+  if(th.bg_color)document.documentElement.style.setProperty('--bg',th.bg_color);
+  if(th.secondary_bg_color)document.documentElement.style.setProperty('--bg2',th.secondary_bg_color);
+  if(th.text_color)document.documentElement.style.setProperty('--txt',th.text_color);
+  if(th.hint_color)document.documentElement.style.setProperty('--hint',th.hint_color);
+  if(th.button_color)document.documentElement.style.setProperty('--accent',th.button_color);
+}
+
+async function init(){
+  try{
+    const r=await fetch(API+'/api/auth',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({initData:tg?tg.initData:''})});
+    const d=await r.json();
+    if(d.ok)U=d.user; else U={telegram_id:'demo',first_name:'User'};
+  }catch(e){U={telegram_id:'demo',first_name:'User'};}
+  await loadBots();
+  show('dashboard');
+}
+
+async function loadBots(){
+  try{
+    const r=await fetch(`${API}/api/bots?user_id=${U?.telegram_id}`);
+    const d=await r.json();
+    BOTS=d.bots||[];
+  }catch(e){BOTS=[];}
+}
+
+function show(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById('loading').style.display='none';
+  document.getElementById('wizard').style.display='none';
+  document.getElementById(id).classList.add('active');
+}
+
+async function showDash(){await loadBots();renderDash();show('dashboard');}
+
+function renderDash(){
+  document.getElementById('greeting').textContent=`Hello, ${U?.first_name||'User'} \ud83d\udc4b`;
+  const el=document.getElementById('bots-list');
+  if(!BOTS.length){
+    el.innerHTML='<div class="empty"><div class="empty-ico">\ud83e\udd16</div><div class="empty-ttl">No bots yet</div><div class="empty-sub">Create your first bot\nwithout coding!</div></div>';
+    return;
+  }
+  el.innerHTML=BOTS.map(b=>`
+    <div class="bot-card" onclick="showDetail('${b.id}')">
+      <div class="bot-card-row">
+        <div><div class="bot-name">&#129302; ${esc(b.name)}</div><div class="bot-desc">${esc(b.description||'Custom bot')}</div></div>
+        <div class="badge badge-${b.status}">${b.status==='active'?'\u25cf Active':'\u25cb Inactive'}</div>
+      </div>
+    </div>`).join('');
+}
+
+function showDetail(id){
+  const bot=BOTS.find(b=>b.id===id);
+  if(!bot)return;
+  const active=bot.status==='active';
+  let flows='';
+  try{
+    const p=jsyaml.load(bot.yaml_definition||'bot:\n  flows:\n    start:\n    reply: hi');
+    const bc=p?.bot||p; const fl=bc?.flows||{};
+    const keys=Object.keys(fl);
+    if(keys.length){
+      flows='<div class="sec-ttl">Flows ('+(keys.length)+')</div><div class="flows-box">'+
+        keys.map(k=>{const f=fl[k];const t=f?.ask?'Input':f?.reply?'Reply':'Action';
+          return '<div class="flow-row"><div class="flow-ico">'+(t==='Input'?'&#128172;':'&#128228;')+'</div><div><div class="flow-nm">'+esc(k)+'</div><div class="flow-tp">'+t+' flow</div></div></div>';}).join('')+'</div>';
+    }
+  }catch(e){}
+  document.getElementById('det-content').innerHTML=`
+    <div class="det-hdr">
+      <div class="det-name">&#129302; ${esc(bot.name)}</div>
+      <div class="det-tok">Created: ${new Date(bot.created_at).toLocaleDateString()}</div>
+      <div class="det-status"><span class="badge badge-${bot.status}" style="font-size:14px">${active?'\u25cf Running':'\u25cb Stopped'}</span></div>
+    </div>
+    <div class="action-row">
+      ${active
+        ?`<button class="act-btn act-stop" onclick="deactivate('${bot.id}')">&#9209; Stop Bot</button>`
+        :`<button class="act-btn act-start" onclick="activate('${bot.id}')">&#9654; Start Bot</button>`}
+    </div>
+    <div id="act-msg"></div>
+    ${flows}
+    <button class="del-btn" onclick="delBot('${bot.id}')">&#128465; Delete Bot</button>`;
+  show('detail');
+}
+
+async function activate(id){
+  document.getElementById('act-msg').innerHTML='<div class="msg msg-info">&#8987; Starting...</div>';
+  const r=await fetch(`${API}/api/bots/${id}/activate`,{method:'POST'});
+  const d=await r.json();
+  if(d.ok){document.getElementById('act-msg').innerHTML='<div class="msg msg-ok">&#10003; Bot is live!</div>';await loadBots();setTimeout(()=>showDetail(id),1200);}
+  else document.getElementById('act-msg').innerHTML=`<div class="msg msg-err">&#10007; ${esc(d.error||'Error')}</div>`;
+}
+
+async function deactivate(id){
+  document.getElementById('act-msg').innerHTML='<div class="msg msg-info">Stopping...</div>';
+  await fetch(`${API}/api/bots/${id}/deactivate`,{method:'POST'});
+  document.getElementById('act-msg').innerHTML='<div class="msg msg-info">Stopped.</div>';
+  await loadBots();setTimeout(()=>showDetail(id),1000);
+}
+
+async function delBot(id){
+  if(!confirm('Delete this bot? This cannot be undone.'))return;
+  await fetch(`${API}/api/bots/${id}`,{method:'DELETE'});
+  await showDash();
+}
+
+function openSettings(){
+  document.getElementById('set-content').innerHTML=`
+    <h2 style="font-size:20px;font-weight:700;margin-bottom:16px">Settings</h2>
+    <div style="background:var(--bg2);border-radius:var(--r);overflow:hidden">
+      <div style="display:flex;justify-content:space-between;padding:13px 14px;border-bottom:1px solid rgba(255,255,255,.06)">
+        <span>Telegram ID</span><span style="color:var(--hint)">${U?.telegram_id||'—'}</span></div>
+      <div style="display:flex;justify-content:space-between;padding:13px 14px;border-bottom:1px solid rgba(255,255,255,.06)">
+        <span>Name</span><span style="color:var(--hint)">${esc(U?.first_name||'—')}</span></div>
+      <div style="display:flex;justify-content:space-between;padding:13px 14px">
+        <span>Total bots</span><span style="color:var(--hint)">${BOTS.length}</span></div>
+    </div>`;
+  show('settings');
+}
+
+function openWizard(){
+  WIZ={step:1,token:'',info:null,desc:'',key:'',yaml:'',name:''};
+  document.getElementById('inp-token').value='';
+  document.getElementById('inp-desc').value='';
+  document.getElementById('inp-key').value='';
+  document.getElementById('tok-msg').innerHTML='';
+  document.getElementById('cr-msg').innerHTML='';
+  updateWiz();
+  document.getElementById('wizard').style.display='block';
+}
+
+function closeWizard(){document.getElementById('wizard').style.display='none';}
+
+function updateWiz(){
+  const s=WIZ.step;
+  const titles=['Create Bot','Step 1: Bot Token','Step 2: Description','Step 3: Preview & Create'];
+  document.getElementById('wiz-title').textContent=titles[s];
+  [1,2,3].forEach(i=>{
+    const el=document.getElementById('s'+i);
+    el.style.display=i===s?'block':'none';
+    const d=document.getElementById('d'+i);
+    d.className='step-dot'+(i<s?' done':i===s?' active':'');
+  });
+  document.getElementById('prev-btn').style.display=s>1?'flex':'none';
+  document.getElementById('next-btn').textContent=s===3?'&#10003; Create Bot':'Next &#8594;';
+}
+
+async function wNext(){
+  if(WIZ.step===1){
+    if(!WIZ.info){showMsg('tok-msg','Please verify your bot token first','err');return;}
+    WIZ.step=2;updateWiz();
+  }else if(WIZ.step===2){
+    const desc=document.getElementById('inp-desc').value.trim();
+    if(!desc){alert('Please describe what your bot should do');return;}
+    WIZ.desc=desc;WIZ.key=document.getElementById('inp-key').value.trim();
+    WIZ.step=3;updateWiz();
+    document.getElementById('inp-name').value=WIZ.info?.first_name||'My Bot';
+    document.getElementById('yaml-out').textContent='\u23f3 Generating...';
+    document.getElementById('next-btn').disabled=true;
+    await genYaml();
+    document.getElementById('next-btn').disabled=false;
+  }else if(WIZ.step===3){
+    await createBot();
+  }
+}
+
+function wPrev(){WIZ.step=Math.max(1,WIZ.step-1);updateWiz();}
+
+async function verifyToken(){
+  const token=document.getElementById('inp-token').value.trim();
+  if(!token){showMsg('tok-msg','Enter a token','err');return;}
+  const btn=document.getElementById('vfy-btn');
+  btn.textContent='...';btn.disabled=true;
+  try{
+    const r=await fetch(`https://api.telegram.org/bot${token}/getMe`);
+    const d=await r.json();
+    if(d.ok){
+      WIZ.token=token;WIZ.info=d.result;
+      document.getElementById('tok-msg').innerHTML=`<div class="msg msg-ok">&#10003; <b>@${esc(d.result.username)}</b> verified!</div>`;
+    }else{
+      WIZ.info=null;showMsg('tok-msg','&#10007; Invalid token','err');
+    }
+  }catch(e){showMsg('tok-msg','&#10007; Network error','err');}
+  btn.textContent='Verify';btn.disabled=false;
+}
+
+async function genYaml(){
+  try{
+    const r=await fetch(API+'/api/generate',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({description:WIZ.desc,api_key:WIZ.key,bot_name:WIZ.info?.first_name||'My Bot'})});
+    const d=await r.json();
+    if(d.ok){
+      WIZ.yaml=d.yaml;
+      document.getElementById('yaml-out').textContent=d.yaml;
+      if(d.source==='template')showMsg('cr-msg','Template used (no API key). Works great!','info');
+    }else{
+      WIZ.yaml='';document.getElementById('yaml-out').textContent='Generation failed';
+    }
+  }catch(e){document.getElementById('yaml-out').textContent='Error: '+e.message;}
+}
+
+async function createBot(){
+  const name=(document.getElementById('inp-name').value||WIZ.info?.first_name||'My Bot').trim();
+  document.getElementById('next-btn').disabled=true;
+  document.getElementById('next-btn').textContent='Creating...';
+  try{
+    const r=await fetch(API+'/api/bots',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({user_id:U?.telegram_id,name,description:WIZ.desc,yaml_definition:WIZ.yaml,bot_token:WIZ.token})});
+    const d=await r.json();
+    if(d.ok){
+      showMsg('cr-msg','&#10003; Bot created! Activating...','ok');
+      const r2=await fetch(`${API}/api/bots/${d.bot_id}/activate`,{method:'POST'});
+      const d2=await r2.json();
+      if(d2.ok)showMsg('cr-msg','&#128640; Bot is live and running 24/7!','ok');
+      else showMsg('cr-msg','&#10003; Created. Start manually from dashboard.','ok');
+      setTimeout(()=>{closeWizard();showDash();},2200);
+    }else{
+      showMsg('cr-msg','&#10007; '+esc(d.error||'Error'),'err');
+    }
+  }catch(e){showMsg('cr-msg','&#10007; '+e.message,'err');}
+  document.getElementById('next-btn').disabled=false;
+  document.getElementById('next-btn').textContent='&#10003; Create Bot';
+}
+
+function showMsg(id,text,type){document.getElementById(id).innerHTML=`<div class="msg msg-${type}">${text}</div>`;}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+window.addEventListener('DOMContentLoaded',init);
+</script>
+</body>
+</html>
