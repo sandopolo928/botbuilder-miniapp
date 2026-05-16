@@ -324,32 +324,38 @@ Create 3-5 practical flows. Use {{{{input}}}} for user input in on_input replies
         return jsonify({"ok": True, "yaml": _simple_template(bot_name, description), "source": "template", "note": str(e)})
 
 
-def _simple_template(name, description):
-    desc_short = description[:80].replace('"', '\\\"\')
-    return f'''bot:
-  name: "{name}"
-  platform: telegram
-  default_reply: "Please use the menu below."
-  menu:
-    - text: "\u2139\ufe0f About"
-      flow: about
-    - text: "\ud83d\udcde Contact"
-      flow: contact
-    - text: "\u2753 Help"
-      flow: help
-  flows:
-    about:
-      reply: "Welcome! {desc_short}"
-      show_menu: true
-    contact:
-      ask: "Send your message:"
-      on_input:
-        reply: "\u2705 Received: {{{{input}}}}"
-        show_menu: true
-    help:
-      reply: "Use the menu buttons to navigate."
-      show_menu: true'''
 
+
+def _simple_template(name, description):
+    q = chr(34)
+    safe_name = str(name or "Bot").replace(chr(34), chr(39))
+    safe_desc = str(description or "")[:80].replace(chr(34), chr(39))
+    lines = [
+        "bot:",
+        "  name: " + q + safe_name + q,
+        "  platform: telegram",
+        "  default_reply: " + q + "Please use the menu below." + q,
+        "  menu:",
+        "    - text: " + q + chr(0x2139) + chr(0xfe0f) + " About" + q,
+        "      flow: about",
+        "    - text: " + q + chr(0x1f4de) + " Contact" + q,
+        "      flow: contact",
+        "    - text: " + q + chr(0x2753) + " Help" + q,
+        "      flow: help",
+        "  flows:",
+        "    about:",
+        "      reply: " + q + "Welcome! " + safe_desc + q,
+        "      show_menu: true",
+        "    contact:",
+        "      ask: " + q + "Send your message:" + q,
+        "      on_input:",
+        "        reply: " + q + chr(0x2705) + " Received: {{input}}" + q,
+        "        show_menu: true",
+        "    help:",
+        "      reply: " + q + "Use the menu buttons to navigate." + q,
+        "      show_menu: true",
+    ]
+    return chr(10).join(lines)
 
 def _tg_send(token, chat_id, text, reply_markup=None):
     data = {"chat_id": chat_id, "text": text, "parse_mode": "HTML"}
