@@ -7,7 +7,7 @@ import requests as req
 import yaml as pyyaml
 
 app = Flask(__name__, static_folder='static')
-VERSION = '3.1.0'
+VERSION = '4.0.0'
 BOTBUILDER_TOKEN = os.environ.get('BOTBUILDER_TOKEN', '')
 DATABASE_URL = os.environ.get('DATABASE_URL', '')
 RAILWAY_URL = os.environ.get('RAILWAY_URL', '')
@@ -641,7 +641,7 @@ def init_db():
                 name TEXT NOT NULL, description TEXT DEFAULT '',
                 yaml_definition TEXT DEFAULT '', bot_token TEXT, bot_token_hash TEXT UNIQUE,
                 bot_username TEXT DEFAULT '', ai_api_key TEXT DEFAULT '',
-                ai_provider TEXT DEFAULT 'anthropic', status TEXT DEFAULT 'inactive',
+                ai_provider TEXT DEFAULT 'anthropic', yaml_backup TEXT DEFAULT '', status TEXT DEFAULT 'inactive',
                 created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW())""")
             for col, defn in [
                 ('bot_username', "TEXT DEFAULT ''"),
@@ -957,497 +957,31 @@ def generate_yaml():
     data = request.json or {}
     desc = (data.get('description') or '').strip()
     api_key = (data.get('api_key') or '').strip()
-    provider = data.get('ai_provider', 'anthropic')
+    provider = data.get('ai_provider','anthropic')
     bot_name = (data.get('bot_name') or 'My Bot').strip()
     tmpl_base = (data.get('template_yaml') or '').strip()
-    if not desc:
-        return jsonify({'error': 'description required'}), 400
+    if not desc: return jsonify({'error': 'description required'}), 400
     has_ai = bool(data.get('ai_api_key') or api_key)
     if not api_key:
-        tmpl = _make_simple_template(bot_name, desc, has_ai)
-        return jsonify({'ok': True, 'yaml': tmpl, 'source': 'template', 'warnings': []})
-    if tmpl_base:
-        prompt = (
-            f'Adapt this Telegram bot YAML template based on this customization request: "{desc}"\n\n'
-            f'BASE TEMPLATE:\n{tmpl_base}\n\n'
-            'RULES: Keep same structure. Only use supported directives: ask, reply, show_menu, '
-            'next_flow, call_ai (system+prompt), call_ai_vision (prompt). '
-            'Max 5 flows. reply uses {{input}} or {{ai_result}}. '
-            'Return ONLY valid YAML, no markdown, no explanation.'
-        )
-    else:
-        prompt = (
-            f'Create a Telegram bot YAML for: "{desc}"\n\n'
-            'STRICT RULES:\n'
-            '- Maximum 4 content flows + 1 help flow = 5 total\n'
-            '- Menu buttons must match flows exactly\n'
-            '- ONLY use these directives: ask, reply, show_menu, next_flow, call_ai, call_ai_vision\n'
-            '- call_ai format: {system: "...", prompt: "{{input}}"}\n'
-            '- call_ai_vision format: {prompt: "..."}\n'
-            '- reply: "{{ai_result}}" shows AI response\n'
-            '- reply: "{{input}}" echoes user text (no AI needed)\n'
-            '- DO NOT USE: call_api, db_insert, db_query, schedule, user_var_set, conditions, store_as\n'
-            '- For photo flows: ask + on_input.call_ai_vision\n\n'
-            'EXACT FORMAT TO USE:\nbot:\n  name: "BotName"\n  platform: telegram\n'
-            '  welcome: "Welcome message"\n  default_reply: "Use the menu."\n'
-            '  menu:\n    - text: "Button"\n      flow: flow_name\n'
-            '  flows:\n    flow_name:\n      ask: "Question:"\n      on_input:\n'
-            '        call_ai:\n          system: "You are X."\n          prompt: "{{input}}"\n'
-            '        reply: "{{ai_result}}"\n        show_menu: true\n\n'
-            'Return ONLY valid YAML. No markdown. No explanation.'
-        )
-    try:
-        if provider == 'openai':
-            r = req.post('https://api.openai.com/v1/chat/completions',
-                headers={'Authorization': f'Bearer {api_key}', 'Content-Type': 'application/json'},
-                json={'model': 'gpt-4o-mini', 'max_tokens': 2000,
-                      'messages': [{'role': 'user', 'content': prompt}]}, timeout=30)
-            content = r.json()['choices'][0]['message']['content'] if r.ok else None
-        else:
-            r = req.post('https://api.anthropic.com/v1/messages',
-                headers={'x-api-key': api_key, 'anthropic-version': '2023-06-01',
-                         'content-type': 'application/json'},
-                json={'model': 'claude-haiku-4-5', 'max_tokens': 2000,
-                      'messages': [{'role': 'user', 'content': prompt}]}, timeout=30)
-            content = r.json()['content'][0]['text'] if r.ok else None
-        if not content:
-            tmpl = _make_simple_template(bot_name, desc, has_ai)
-            return jsonify({'ok': True, 'yaml': tmpl, 'source': 'template', 'warnings': ['AI generation failed, used template']})
-        m = re.search(r'```(?:yaml)?\n(.*?)\n```', content, re.DOTALL)
-        yaml_text = m.group(1) if m else content.strip()
-        if yaml_text.startswith('```'):
-            yaml_text = re.sub(r'^```\w*\n?', '', yaml_text).rstrip('`').strip()
-        pyyaml.safe_load(yaml_text)
-        clean, warnings = _sanitize_yaml(yaml_text)
-        return jsonify({'ok': True, 'yaml': clean, 'source': 'ai', 'warnings': warnings})
+        return jsonify({'ok': True, 'yaml': _make_simple_template(bot_name, desc, has_ai),
+                        'source': 'template', 'warnings': []})
+    detected = _detect_choices(desc)
+    prompt = _build_smart_prompt(desc, bot_name, detected, tmpl_base or None)
+    raw = _call_ai_generate(api_key, provider, prompt, use_sonnet=True)
+    if not raw:
+        return jsonify({'ok': True, 'yaml': _make_simple_template(bot_name, desc, has_ai),
+                        'source': 'template', 'warnings': ['AI generation failed']})
+    yt = _clean_yaml_from_ai(raw)
+    if not yt:
+        return jsonify({'ok': True, 'yaml': _make_simple_template(bot_name, desc, has_ai),
+                        'source': 'template', 'warnings': ['Parse failed']})
+    try: pyyaml.safe_load(yt)
     except Exception as e:
-        tmpl = _make_simple_template(bot_name, desc, has_ai)
-        return jsonify({'ok': True, 'yaml': tmpl, 'source': 'template',
-                        'warnings': [f'AI error: {e}']})
-
-
-def _make_simple_template(name, desc, has_ai=False):
-    q = chr(34); n = str(name or 'Bot').replace(chr(34), chr(39))
-    d = str(desc or '')[:80].replace(chr(34), chr(39))
-    if has_ai:
-        lines = [
-            'bot:', f'  name: {q}{n}{q}', '  platform: telegram',
-            f'  welcome: {q}' + chr(0x1f44b) + f' Hello! I am {n}.{q}',
-            f'  default_reply: {q}Send a message or use the menu.{q}',
-            '  menu:',
-            f'    - text: {q}' + chr(0x1f4ac) + f' Chat{q}', '      flow: ai_chat',
-            f'    - text: {q}' + chr(0x1f4f7) + f' Send Photo{q}', '      flow: photo',
-            f'    - text: {q}' + chr(0x2753) + f' Help{q}', '      flow: help',
-            '  flows:',
-            '    ai_chat:',
-            f'      ask: {q}What would you like to know?{q}',
-            '      on_input:',
-            '        call_ai:',
-            f'          system: {q}You are a helpful assistant. Context: {d}{q}',
-            f'          prompt: {q}' + '{{input}}' + f'{q}',
-            f'        reply: {q}' + '{{ai_result}}' + f'{q}',
-            '        show_menu: true',
-            '    photo:',
-            f'      ask: {q}Send a photo:{q}',
-            '      on_input:',
-            '        call_ai_vision:',
-            f'          prompt: {q}Describe and analyze this image.{q}',
-            f'        reply: {q}' + '{{ai_result}}' + f'{q}',
-            '        show_menu: true',
-            '    help:',
-            f'      reply: {q}' + chr(0x1f4a1) + f' I am {n}. {d} Use the menu to get started.{q}',
-            '      show_menu: true'
-        ]
-    else:
-        lines = [
-            'bot:', f'  name: {q}{n}{q}', '  platform: telegram',
-            f'  welcome: {q}' + chr(0x1f44b) + f' Welcome! I am {n}.{q}',
-            f'  default_reply: {q}Please use the menu below.{q}',
-            '  menu:',
-            f'    - text: {q}' + chr(0x2139) + chr(0xfe0f) + f' About{q}', '      flow: about',
-            f'    - text: {q}' + chr(0x1f4de) + f' Contact{q}', '      flow: contact',
-            f'    - text: {q}' + chr(0x2753) + f' Help{q}', '      flow: help',
-            '  flows:',
-            '    about:',
-            f'      reply: {q}' + chr(0x2139) + chr(0xfe0f) + f' {d}{q}',
-            '      show_menu: true',
-            '    contact:',
-            f'      ask: {q}' + chr(0x1f4de) + f' Send your message:{q}',
-            '      on_input:',
-            f'        reply: {q}' + chr(0x2705) + ' Received: {{input}}' + f'{q}',
-            '        show_menu: true',
-            '    help:',
-            f'      reply: {q}' + chr(0x2753) + f' Use menu buttons to navigate. I am {n}.{q}',
-            '      show_menu: true'
-        ]
-    return chr(10).join(lines)
-
-
-def _tg_send(token, chat_id, text, markup=None):
-    d = {'chat_id': chat_id, 'text': str(text) or '.', 'parse_mode': 'HTML'}
-    if markup:
-        d['reply_markup'] = markup
-    try:
-        req.post(f'https://api.telegram.org/bot{token}/sendMessage', json=d, timeout=10)
-    except Exception:
-        pass
-
-
-def _build_keyboard(menu):
-    if not menu:
-        return None
-    rows, row = [], []
-    for item in menu:
-        row.append({'text': item.get('text', '')})
-        if len(row) == 2:
-            rows.append(row); row = []
-    if row:
-        rows.append(row)
-    return {'keyboard': rows, 'resize_keyboard': True}
-
-
-def _send_with_menu(token, chat_id, text, menu):
-    kb = _build_keyboard(menu)
-    d = {'chat_id': chat_id, 'text': str(text) or '.', 'parse_mode': 'HTML'}
-    if kb:
-        d['reply_markup'] = kb
-    try:
-        req.post(f'https://api.telegram.org/bot{token}/sendMessage', json=d, timeout=10)
-    except Exception:
-        pass
-
-
-def _get_state(bot_id, chat_id, key):
-    conn = get_db()
-    try:
-        with conn.cursor() as cur:
-            cur.execute('SELECT state_value FROM bot_states WHERE bot_id=%s AND chat_id=%s AND state_key=%s',
-                (bot_id, str(chat_id), key))
-            row = cur.fetchone()
-            return row['state_value'] if row else ''
-    except Exception:
-        return ''
-    finally:
-        conn.close()
-
-
-def _set_state(bot_id, chat_id, key, value):
-    conn = get_db()
-    try:
-        with conn.cursor() as cur:
-            cur.execute("""INSERT INTO bot_states (bot_id,chat_id,state_key,state_value)
-                VALUES (%s,%s,%s,%s) ON CONFLICT (bot_id,chat_id,state_key)
-                DO UPDATE SET state_value=EXCLUDED.state_value, updated_at=NOW()""",
-                (bot_id, str(chat_id), key, value))
-        conn.commit()
-    except Exception as e:
-        print(f'[state] {e}')
-    finally:
-        conn.close()
-
-
-def _get_photo_url(token, file_id):
-    try:
-        r = req.get(f'https://api.telegram.org/bot{token}/getFile',
-            params={'file_id': file_id}, timeout=10)
-        if r.ok:
-            return f'https://api.telegram.org/file/bot{token}/{r.json()["result"]["file_path"]}'
-    except Exception:
-        pass
-    return None
-
-
-def _ai_text(api_key, provider, system, user_msg):
-    if not api_key:
-        return chr(0x26a0) + ' AI key not configured. Add it in bot settings via Mini App.'
-    try:
-        if provider == 'openai':
-            r = req.post('https://api.openai.com/v1/chat/completions',
-                headers={'Authorization': f'Bearer {api_key}', 'Content-Type': 'application/json'},
-                json={'model': 'gpt-4o-mini', 'max_tokens': 2000,
-                      'messages': [{'role': 'system', 'content': system},
-                                   {'role': 'user', 'content': user_msg}]}, timeout=60)
-            return r.json()['choices'][0]['message']['content'] if r.ok else f'AI error {r.status_code}'
-        else:
-            r = req.post('https://api.anthropic.com/v1/messages',
-                headers={'x-api-key': api_key, 'anthropic-version': '2023-06-01',
-                         'content-type': 'application/json'},
-                json={'model': 'claude-haiku-4-5', 'max_tokens': 2000,
-                      'system': system, 'messages': [{'role': 'user', 'content': user_msg}]},
-                timeout=60)
-            return r.json()['content'][0]['text'] if r.ok else f'AI error {r.status_code}'
-    except Exception as e:
-        return f'AI error: {e}'
-
-
-def _ai_vision(api_key, provider, prompt, img_url):
-    if not api_key:
-        return chr(0x26a0) + ' AI key not configured. Add it in bot settings via Mini App.'
-    if not img_url:
-        return chr(0x26a0) + ' Could not download image from Telegram.'
-    try:
-        if provider == 'openai':
-            r = req.post('https://api.openai.com/v1/chat/completions',
-                headers={'Authorization': f'Bearer {api_key}', 'Content-Type': 'application/json'},
-                json={'model': 'gpt-4o-mini', 'max_tokens': 2000,
-                      'messages': [{'role': 'user', 'content': [
-                          {'type': 'text', 'text': prompt},
-                          {'type': 'image_url', 'image_url': {'url': img_url, 'detail': 'high'}}
-                      ]}]}, timeout=90)
-            return r.json()['choices'][0]['message']['content'] if r.ok else f'Vision error {r.status_code}'
-        else:
-            img_r = req.get(img_url, timeout=30)
-            if not img_r.ok:
-                return 'Could not download image.'
-            img_b64 = b64mod.b64encode(img_r.content).decode()
-            mt = img_r.headers.get('content-type', 'image/jpeg').split(';')[0]
-            r = req.post('https://api.anthropic.com/v1/messages',
-                headers={'x-api-key': api_key, 'anthropic-version': '2023-06-01',
-                         'content-type': 'application/json'},
-                json={'model': 'claude-haiku-4-5', 'max_tokens': 2000,
-                      'messages': [{'role': 'user', 'content': [
-                          {'type': 'image', 'source': {'type': 'base64', 'media_type': mt, 'data': img_b64}},
-                          {'type': 'text', 'text': prompt}
-                      ]}]}, timeout=90)
-            return r.json()['content'][0]['text'] if r.ok else f'Vision error {r.status_code}'
-    except Exception as e:
-        return f'Vision error: {e}'
-
-
-def _sub_vars(text, user_input=None, ai_result=None):
-    """Substitute template variables in text."""
-    t = str(text)
-    now = datetime.now()
-    t = t.replace('{{today}}', now.strftime('%d.%m.%Y'))
-    t = t.replace('{{date}}', now.strftime('%d.%m.%Y'))
-    t = t.replace('{{month}}', now.strftime('%B'))
-    t = t.replace('{{year}}', str(now.year))
-    t = t.replace('{{time}}', now.strftime('%H:%M'))
-    if user_input is not None:
-        t = t.replace('{{input}}', str(user_input))
-    if ai_result is not None:
-        t = t.replace('{{ai_result}}', str(ai_result))
-        t = t.replace('{{result}}', str(ai_result))
-    return t
-
-
-def _exec_on_input(token, on_input, chat_id, ai_key, ai_prov, user_text=None, photo_fid=None):
-    """Execute on_input directives. Returns (reply_text, show_menu, next_flow)."""
-    ai_result = None
-    has_ai_call = any(k in on_input for k in [
-        'call_ai', 'call_openai', 'call_anthropic',
-        'call_ai_vision', 'call_openai_vision', 'call_anthropic_vision'
-    ])
-    loading = on_input.get('loading_text', '')
-    if has_ai_call and ai_key and loading:
-        _tg_send(token, chat_id, loading)
-    elif has_ai_call and ai_key:
-        _tg_send(token, chat_id, chr(0x23f3) + ' Processing...')
-    if user_text is not None:
-        for call_key, prov in [('call_ai', ai_prov), ('call_openai', 'openai'), ('call_anthropic', 'anthropic')]:
-            if call_key in on_input:
-                c = on_input[call_key] if isinstance(on_input[call_key], dict) else {}
-                sys_p = c.get('system', 'You are a helpful assistant.')
-                usr_p = _sub_vars(c.get('prompt', '{{input}}'), user_input=user_text)
-                ai_result = _ai_text(ai_key, prov, sys_p, usr_p)
-                break
-        if ai_result is None and ai_key and '{{ai_result}}' in str(on_input.get('reply', '')):
-            ai_result = _ai_text(ai_key, ai_prov, 'You are a helpful assistant.', user_text)
-    if photo_fid is not None:
-        img_url = _get_photo_url(token, photo_fid)
-        found_vision = False
-        for vkey, prov in [('call_ai_vision', ai_prov), ('call_openai_vision', 'openai'), ('call_anthropic_vision', 'anthropic')]:
-            if vkey in on_input:
-                c = on_input[vkey] if isinstance(on_input[vkey], dict) else {}
-                prompt = c.get('prompt', 'Describe this image.')
-                ai_result = _ai_vision(ai_key, prov, prompt, img_url)
-                found_vision = True; break
-        if not found_vision and ai_key and img_url:
-            vp = on_input.get('vision_prompt', 'Describe this image and extract any text.')
-            ai_result = _ai_vision(ai_key, ai_prov, vp, img_url)
-        elif not found_vision and not ai_key:
-            ai_result = chr(0x26a0) + ' This bot needs an AI key for photo analysis. Add it in bot settings.'
-    tpl = str(on_input.get('reply', ''))
-    if tpl:
-        if ai_result and '{{ai_result}}' not in tpl and '{{result}}' not in tpl:
-            tpl = tpl + '\n' + str(ai_result)
-        reply = _sub_vars(tpl, user_input=user_text, ai_result=ai_result)
-        return reply, bool(on_input.get('show_menu')), str(on_input.get('next_flow', ''))
-    if ai_result:
-        return str(ai_result), bool(on_input.get('show_menu')), str(on_input.get('next_flow', ''))
-    return None, False, ''
-
-
-def _run_flow(bot, token, chat_id, flows, flow_key, menu, ai_key, ai_prov, user_text=None, photo_fid=None):
-    flow = flows.get(flow_key)
-    if not flow or not isinstance(flow, dict):
-        return
-    bot_id = bot['id']
-    if photo_fid is not None and flow.get('handle_photo'):
-        img_url = _get_photo_url(token, photo_fid)
-        if ai_key and img_url:
-            _tg_send(token, chat_id, chr(0x23f3) + ' Analyzing image...')
-            c = flow.get('call_ai_vision', {})
-            prompt = c.get('prompt', 'Describe this image.') if isinstance(c, dict) else 'Describe this image.'
-            ai_result = _ai_vision(ai_key, ai_prov, prompt, img_url)
-        else:
-            ai_result = chr(0x26a0) + ' AI key not configured. Add it in bot settings via Mini App.'
-        reply_tpl = str(flow.get('reply', '{{ai_result}}'))
-        reply = _sub_vars(reply_tpl, ai_result=ai_result)
-        if flow.get('show_menu'):
-            _send_with_menu(token, chat_id, reply, menu)
-        else:
-            _tg_send(token, chat_id, reply)
-        nf = str(flow.get('next_flow', ''))
-        if nf and nf in flows:
-            _run_flow(bot, token, chat_id, flows, nf, menu, ai_key, ai_prov)
-        return
-    if 'ask' in flow and user_text is None and photo_fid is None:
-        _tg_send(token, chat_id, flow['ask'])
-        if 'on_input' in flow:
-            _set_state(bot_id, str(chat_id), f'oi_{flow_key}', json.dumps(flow['on_input']))
-        _set_state(bot_id, str(chat_id), 'waiting', flow_key)
-        return
-    if 'reply' in flow:
-        reply = _sub_vars(str(flow['reply']), user_input=user_text)
-        if flow.get('show_menu'):
-            _send_with_menu(token, chat_id, reply, menu)
-        else:
-            _tg_send(token, chat_id, reply)
-    if 'inline_buttons' in flow:
-        try:
-            btns = [[{'text': b['text'], 'callback_data': b.get('flow', b['text'])}
-                     for b in flow['inline_buttons']]]
-            req.post(f'https://api.telegram.org/bot{token}/sendMessage',
-                json={'chat_id': chat_id, 'text': flow.get('ask', 'Choose:'),
-                      'reply_markup': {'inline_keyboard': btns}}, timeout=10)
-        except Exception:
-            pass
-    nf = str(flow.get('next_flow', ''))
-    if nf and nf in flows:
-        _run_flow(bot, token, chat_id, flows, nf, menu, ai_key, ai_prov)
-
-
-def _handle_yaml_bot(bot, update):
-    bot_id = bot['id']; token = bot['bot_token']
-    print(f'[bot:{bot_id}] handling update')
-    ai_key = str(bot.get('ai_api_key') or '')
-    ai_prov = str(bot.get('ai_provider') or 'anthropic')
-    try:
-        cfg = pyyaml.safe_load(bot.get('yaml_definition') or '')
-        if not cfg:
-            return
-        bc = cfg.get('bot', cfg)
-    except Exception as e:
-        print(f'[yaml] {e}'); return
-    flows = bc.get('flows', {}); menu = bc.get('menu', [])
-    default_reply = bc.get('default_reply', 'Please use the menu.')
-    if 'callback_query' in update:
-        cq = update['callback_query']
-        cid = str(cq['message']['chat']['id'])
-        fk = cq.get('data', '')
-        try:
-            req.post(f'https://api.telegram.org/bot{token}/answerCallbackQuery',
-                json={'callback_query_id': cq['id']}, timeout=5)
-        except Exception:
-            pass
-        if fk in flows:
-            _set_state(bot_id, cid, 'waiting', '')
-            _run_flow(bot, token, cid, flows, fk, menu, ai_key, ai_prov)
-        return
-    msg = update.get('message', {})
-    if not msg:
-        return
-    cid = str(msg['chat']['id'])
-    text = msg.get('text', '')
-    photo = msg.get('photo')
-    if text == '/start':
-        _set_state(bot_id, cid, 'waiting', '')
-        welcome = str(bc.get('welcome', 'Welcome! I am ' + str(bc.get('name', 'Bot')) + ' ' + chr(0x1f916)))
-        kb = _build_keyboard(menu)
-        d = {'chat_id': cid, 'text': welcome, 'parse_mode': 'HTML'}
-        if kb:
-            d['reply_markup'] = kb
-        try:
-            req.post(f'https://api.telegram.org/bot{token}/sendMessage', json=d, timeout=10)
-        except Exception:
-            pass
-        return
-    if photo:
-        pfid = photo[-1]['file_id']
-        waiting = _get_state(bot_id, cid, 'waiting')
-        if waiting:
-            oi_str = _get_state(bot_id, cid, f'oi_{waiting}')
-            if oi_str:
-                try:
-                    on_input = json.loads(oi_str)
-                    _set_state(bot_id, cid, 'waiting', '')
-                    reply, sm, nf = _exec_on_input(token, on_input, cid, ai_key, ai_prov,
-                        user_text=None, photo_fid=pfid)
-                    if reply:
-                        if sm:
-                            _send_with_menu(token, cid, reply, menu)
-                        else:
-                            _tg_send(token, cid, reply)
-                    elif not ai_key:
-                        _send_with_menu(token, cid,
-                            chr(0x26a0) + ' Add an AI key in bot settings to process photos.',
-                            menu)
-                    if nf and nf in flows:
-                        _run_flow(bot, token, cid, flows, nf, menu, ai_key, ai_prov)
-                    return
-                except Exception as e:
-                    print(f'[photo_input] {e}')
-                    _set_state(bot_id, cid, 'waiting', '')
-        pf_key = str(bc.get('photo_flow', ''))
-        if not pf_key:
-            for fk, fv in flows.items():
-                if isinstance(fv, dict) and fv.get('handle_photo'):
-                    pf_key = fk; break
-        if pf_key and pf_key in flows:
-            _run_flow(bot, token, cid, flows, pf_key, menu, ai_key, ai_prov, photo_fid=pfid)
-            return
-        if ai_key:
-            img_url = _get_photo_url(token, pfid)
-            if img_url:
-                _tg_send(token, cid, chr(0x23f3) + ' Analyzing your image...')
-                result = _ai_vision(ai_key, ai_prov,
-                    'Describe this image in detail. If there is text, extract and translate it to Russian.',
-                    img_url)
-                _send_with_menu(token, cid, result, menu)
-                return
-        _send_with_menu(token, cid,
-            chr(0x1f4f7) + ' Photo received! Add an AI key to enable photo analysis.',
-            menu)
-        return
-    if not text:
-        return
-    for item in menu:
-        if item.get('text') == text:
-            fk = str(item.get('flow', ''))
-            if fk in flows:
-                _set_state(bot_id, cid, 'waiting', '')
-                _run_flow(bot, token, cid, flows, fk, menu, ai_key, ai_prov)
-                return
-    waiting = _get_state(bot_id, cid, 'waiting')
-    if waiting:
-        oi_str = _get_state(bot_id, cid, f'oi_{waiting}')
-        _set_state(bot_id, cid, 'waiting', '')
-        if oi_str:
-            try:
-                on_input = json.loads(oi_str)
-                reply, sm, nf = _exec_on_input(token, on_input, cid, ai_key, ai_prov, user_text=text)
-                if reply:
-                    if sm:
-                        _send_with_menu(token, cid, reply, menu)
-                    else:
-                        _tg_send(token, cid, reply)
-                if nf and nf in flows:
-                    _run_flow(bot, token, cid, flows, nf, menu, ai_key, ai_prov)
-                return
-            except Exception as e:
-                print(f'[text_input] {e}')
-    _send_with_menu(token, cid, default_reply, menu)
+        return jsonify({'ok': True, 'yaml': _make_simple_template(bot_name, desc, has_ai),
+                        'source': 'template', 'warnings': [f'YAML error: {e}']})
+    clean, warnings = _sanitize_yaml(yt)
+    return jsonify({'ok': True, 'yaml': clean, 'source': 'ai', 'warnings': warnings,
+                    'detected_choices': detected})
 
 
 
@@ -1539,6 +1073,121 @@ def fix_webhook(bot_id):
             conn.close()
         return jsonify({'ok': True, 'webhook_url': wh_url})
     return jsonify({'error': 'setWebhook failed', 'detail': r.json()}), 500
+
+
+@app.route('/api/bots/<bot_id>/yaml', methods=['GET'])
+def get_bot_yaml(bot_id):
+    conn = get_db()
+    try:
+        with conn.cursor() as cur:
+            cur.execute('SELECT yaml_definition, yaml_backup FROM bots WHERE id=%s', (bot_id,))
+            row = cur.fetchone()
+    finally: conn.close()
+    if not row: return jsonify({'error': 'Not found'}), 404
+    return jsonify({'ok': True, 'yaml': row['yaml_definition'] or '',
+                    'has_backup': bool(row.get('yaml_backup'))})
+
+
+@app.route('/api/bots/<bot_id>/apply_patch', methods=['POST'])
+def apply_patch(bot_id):
+    data = request.json or {}
+    new_yaml = data.get('yaml', '')
+    if not new_yaml: return jsonify({'error': 'yaml required'}), 400
+    new_yaml, warnings = _sanitize_yaml(new_yaml)
+    conn = get_db()
+    try:
+        with conn.cursor() as cur:
+            cur.execute('SELECT yaml_definition FROM bots WHERE id=%s', (bot_id,))
+            row = cur.fetchone()
+            old_yaml = row['yaml_definition'] if row else ''
+            cur.execute('UPDATE bots SET yaml_definition=%s, yaml_backup=%s, updated_at=NOW() WHERE id=%s',
+                (new_yaml, old_yaml, bot_id))
+        conn.commit()
+    finally: conn.close()
+    return jsonify({'ok': True, 'message': 'Changes applied!', 'warnings': warnings})
+
+
+@app.route('/api/bots/<bot_id>/revert_yaml', methods=['POST'])
+def revert_yaml_ep(bot_id):
+    conn = get_db()
+    try:
+        with conn.cursor() as cur:
+            cur.execute('SELECT yaml_definition, yaml_backup FROM bots WHERE id=%s', (bot_id,))
+            row = cur.fetchone()
+    finally: conn.close()
+    if not row or not (row.get('yaml_backup') or '').strip():
+        return jsonify({'error': 'No backup available'}), 400
+    conn = get_db()
+    try:
+        with conn.cursor() as cur:
+            cur.execute('UPDATE bots SET yaml_definition=%s, yaml_backup=%s, updated_at=NOW() WHERE id=%s',
+                (row['yaml_backup'], '', bot_id))
+        conn.commit()
+    finally: conn.close()
+    return jsonify({'ok': True, 'message': 'Reverted to previous version!'})
+
+
+@app.route('/api/bots/<bot_id>/add_feature', methods=['POST'])
+def add_feature(bot_id):
+    data = request.json or {}
+    desc = (data.get('description') or '').strip()
+    api_key = (data.get('api_key') or '').strip()
+    provider = data.get('ai_provider', 'anthropic')
+    if not desc: return jsonify({'error': 'description required'}), 400
+    conn = get_db()
+    try:
+        with conn.cursor() as cur:
+            cur.execute('SELECT yaml_definition, ai_api_key, ai_provider FROM bots WHERE id=%s', (bot_id,))
+            bot = cur.fetchone()
+    finally: conn.close()
+    if not bot: return jsonify({'error': 'Bot not found'}), 404
+    bot = dict(bot)
+    existing = bot.get('yaml_definition', '')
+    if not existing: return jsonify({'error': 'Bot has no YAML. Use Rebuild Bot instead.'}), 400
+    if not api_key: api_key = bot.get('ai_api_key', ''); provider = bot.get('ai_provider', 'anthropic')
+    if not api_key: return jsonify({'error': 'API key required. Add it in bot settings.'}), 400
+    detected = _detect_choices(desc)
+    prompt = _build_patch_prompt(existing, desc, detected)
+    raw = _call_ai_generate(api_key, provider, prompt, use_sonnet=True)
+    if not raw: return jsonify({'error': 'AI generation failed. Check your API key.'}), 500
+    yt = _clean_yaml_from_ai(raw)
+    if not yt: return jsonify({'error': 'Could not parse AI response'}), 500
+    try: pyyaml.safe_load(yt)
+    except Exception as e: return jsonify({'error': f'Generated YAML invalid: {e}'}), 500
+    clean, warnings = _sanitize_yaml(yt)
+    diff = _diff_yamls(existing, clean)
+    return jsonify({'ok': True, 'new_yaml': clean, 'diff': diff, 'warnings': warnings,
+                    'detected_choices': detected})
+
+
+@app.route('/api/bots/<bot_id>/rebuild', methods=['POST'])
+def rebuild_bot(bot_id):
+    data = request.json or {}
+    desc = (data.get('description') or '').strip()
+    api_key = (data.get('api_key') or '').strip()
+    provider = data.get('ai_provider', 'anthropic')
+    if not desc: return jsonify({'error': 'description required'}), 400
+    conn = get_db()
+    try:
+        with conn.cursor() as cur:
+            cur.execute('SELECT name, ai_api_key, ai_provider FROM bots WHERE id=%s', (bot_id,))
+            bot = cur.fetchone()
+    finally: conn.close()
+    if not bot: return jsonify({'error': 'Bot not found'}), 404
+    bot = dict(bot)
+    if not api_key: api_key = bot.get('ai_api_key', ''); provider = bot.get('ai_provider', 'anthropic')
+    if not api_key: return jsonify({'error': 'API key required. Add it in bot settings.'}), 400
+    detected = _detect_choices(desc)
+    prompt = _build_smart_prompt(desc, bot.get('name', 'My Bot'), detected)
+    raw = _call_ai_generate(api_key, provider, prompt, use_sonnet=True)
+    if not raw: return jsonify({'error': 'AI generation failed. Check your API key.'}), 500
+    yt = _clean_yaml_from_ai(raw)
+    if not yt: return jsonify({'error': 'Could not parse AI response'}), 500
+    try: pyyaml.safe_load(yt)
+    except Exception as e: return jsonify({'error': f'Invalid YAML: {e}'}), 500
+    clean, warnings = _sanitize_yaml(yt)
+    return jsonify({'ok': True, 'yaml': clean, 'warnings': warnings, 'detected_choices': detected})
+
 
 @app.route('/webhook', methods=['POST'])
 def botbuilder_webhook():
