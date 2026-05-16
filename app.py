@@ -1190,10 +1190,9 @@ def rebuild_bot(bot_id):
 
 
 @app.route('/webhook', methods=['POST'])
+@app.route('/webhook', methods=['POST'])
 def botbuilder_webhook():
-    """Handle updates for the BotBuilder bot itself."""
     if not BOTBUILDER_TOKEN:
-        print('[bb] BOTBUILDER_TOKEN not set!')
         return 'ok'
     update = request.json or {}
     try:
@@ -1202,65 +1201,16 @@ def botbuilder_webhook():
         if not cid:
             return 'ok'
         mu = f'{RAILWAY_URL}/app' if RAILWAY_URL else ''
-        if not mu:
-            _tg_send(BOTBUILDER_TOKEN, cid,
-                chr(0x1f44b) + ' Welcome to <b>BotBuilder</b>! Visit: ' + (RAILWAY_URL or 'not configured'))\nreturn 'ok'
-        welcome_text = (
-            chr(0x1f44b) + ' Welcome to <b>BotBuilder</b>!\n\n'
-            'Create Telegram bots in minutes — no code required.
-
-'
-            chr(0x1f4f2) + ' Tap the button below to open the app:'
-        )
-        # Strategy 1: Inline keyboard with web_app button
-        sent = False
-        try:
-            resp = req.post(
-                f'https://api.telegram.org/bot{BOTBUILDER_TOKEN}/sendMessage',
-                json={
-                    'chat_id': cid,
-                    'text': welcome_text,
-                    'parse_mode': 'HTML',
-                    'reply_markup': {
-                        'inline_keyboard': [[
-                            {'text': chr(0x1f916) + ' Open BotBuilder', 'web_app': {'url': mu}}
-                        ]]
-                    }
-                },
-                timeout=10
-            )
-            result = resp.json()
-            if result.get('ok'):
-                sent = True
-                print(f'[bb] Sent web_app inline button to {cid}')
-            else:
-                print(f'[bb] Inline web_app failed: {result.get("description")} — trying fallback')
-        except Exception as e:
-            print(f'[bb] Inline web_app exception: {e}')
-        # Strategy 2: Plain text with URL link
-        if not sent:
-            try:
-                resp2 = req.post(
-                    f'https://api.telegram.org/bot{BOTBUILDER_TOKEN}/sendMessage',
-                    json={
-                        'chat_id': cid,
-                        'text': (welcome_text + f'\n\n' + chr(0x1f517) + f' <a href=\"{mu}\">Open BotBuilder</a>'),
-                        'parse_mode': 'HTML'
-                    },
-                    timeout=10
-                )
-                result2 = resp2.json()
-                if result2.get('ok'):
-                    sent = True
-                    print(f'[bb] Sent plain link to {cid}')
-                else:
-                    print(f'[bb] Plain text also failed: {result2.get("description")}')
-            except Exception as e2:
-                print(f'[bb] Plain text exception: {e2}')
-        if not sent:
-            print(f'[bb] ALL strategies failed for chat_id={cid}')
+        wave = chr(0x1f44b)
+        robot = chr(0x1f916)
+        if mu:
+            welcome_text = wave + ' Welcome to <b>BotBuilder</b>!\n\nCreate Telegram bots in minutes.\nTap below:'
+            kb = {'inline_keyboard': [[{'text': robot + ' Open BotBuilder', 'web_app': {'url': mu}}]]}
+            _tg_send(BOTBUILDER_TOKEN, cid, welcome_text, kb)
+        else:
+            _tg_send(BOTBUILDER_TOKEN, cid, wave + ' Welcome to BotBuilder!')
     except Exception as e:
-        print(f'[bb] Unhandled error: {type(e).__name__}: {e}')
+        print(f'[bb] {e}')
     return 'ok'
 
 
