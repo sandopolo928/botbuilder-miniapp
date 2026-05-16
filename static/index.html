@@ -10,75 +10,90 @@
 *{box-sizing:border-box;margin:0;padding:0}
 :root{--bg:#1c1c1e;--bg2:#2c2c2e;--bg3:#3a3a3c;--txt:#fff;--hint:#8e8e93;--accent:#0a84ff;--ok:#34c759;--warn:#ff9f0a;--err:#ff3b30;--r:14px}
 body{background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:16px;min-height:100vh;overflow-x:hidden}
-.screen{display:none;padding:16px 16px 80px}
+.screen{display:none;padding:16px 16px 90px}
 .screen.active{display:block}
 #loading{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;gap:16px}
-.logo{font-size:64px}
-.app-title{font-size:28px;font-weight:700}
+.logo{font-size:64px}.app-title{font-size:28px;font-weight:700}
 .spinner{width:36px;height:36px;border:3px solid rgba(255,255,255,.1);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 .hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
-.hdr-left h1{font-size:22px;font-weight:700}
-.hdr-left p{font-size:13px;color:var(--hint);margin-top:2px}
+.hdr-left h1{font-size:22px;font-weight:700}.hdr-left p{font-size:13px;color:var(--hint);margin-top:2px}
 .icon-btn{background:var(--bg2);border:none;color:var(--txt);width:36px;height:36px;border-radius:10px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center}
 .bot-card{background:var(--bg2);border-radius:var(--r);padding:16px;margin-bottom:10px;cursor:pointer;transition:opacity .15s}
 .bot-card:active{opacity:.7}
-.bot-card-row{display:flex;align-items:center;justify-content:space-between}
-.bot-name{font-size:17px;font-weight:600}
-.bot-desc{font-size:13px;color:var(--hint);margin-top:3px}
-.badge{padding:4px 10px;border-radius:20px;font-size:12px;font-weight:600}
+.bot-row{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+.bot-name{font-size:17px;font-weight:600}.bot-desc{font-size:13px;color:var(--hint);margin-top:3px}
+.bot-tags{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+.badge{padding:3px 9px;border-radius:20px;font-size:12px;font-weight:600;flex-shrink:0}
 .badge-active{background:rgba(52,199,89,.15);color:var(--ok)}
 .badge-inactive{background:rgba(142,142,147,.15);color:var(--hint)}
+.badge-ai{background:rgba(10,132,255,.12);color:var(--accent);font-size:11px}
+.badge-noai{background:rgba(255,159,10,.12);color:var(--warn);font-size:11px}
 .empty{text-align:center;padding:60px 20px}
-.empty-ico{font-size:60px;margin-bottom:16px}
-.empty-ttl{font-size:20px;font-weight:600;margin-bottom:8px}
+.empty-ico{font-size:60px;margin-bottom:16px}.empty-ttl{font-size:20px;font-weight:600;margin-bottom:8px}
 .empty-sub{color:var(--hint);font-size:15px}
-.fab{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--accent);color:#fff;border:none;border-radius:var(--r);padding:14px;font-size:16px;font-weight:600;cursor:pointer;width:calc(100% - 32px);max-width:420px;box-shadow:0 4px 20px rgba(10,132,255,.4)}
+.bottom-bar{position:fixed;bottom:0;left:0;right:0;background:var(--bg);border-top:1px solid rgba(255,255,255,.08);padding:12px 16px;display:flex;gap:10px;z-index:50}
+.btn-fab{flex:2;background:var(--accent);color:#fff;border:none;border-radius:var(--r);padding:14px;font-size:16px;font-weight:600;cursor:pointer}
+.btn-tmpl{flex:1;background:var(--bg2);color:var(--txt);border:1.5px solid rgba(255,255,255,.1);border-radius:var(--r);padding:14px;font-size:14px;font-weight:600;cursor:pointer}
 .overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:var(--bg);z-index:200;overflow-y:auto;display:none}
 .ovl-hdr{display:flex;align-items:center;padding:16px;border-bottom:1px solid rgba(255,255,255,.08);position:sticky;top:0;background:var(--bg);z-index:1}
 .close-btn{background:none;border:none;color:var(--hint);font-size:22px;cursor:pointer;padding:0 12px 0 0;line-height:1}
-.ovl-title{font-size:18px;font-weight:700}
-.ovl-body{padding:20px 16px 40px}
+.ovl-title{font-size:18px;font-weight:700}.ovl-body{padding:20px 16px 40px}
 .steps{display:flex;gap:6px;margin-bottom:24px}
 .step-dot{height:4px;border-radius:2px;flex:1;background:rgba(255,255,255,.12);transition:background .3s}
-.step-dot.active{background:var(--accent)}
-.step-dot.done{background:var(--ok)}
+.step-dot.active{background:var(--accent)}.step-dot.done{background:var(--ok)}
 .form-grp{margin-bottom:18px}
 .form-lbl{font-size:12px;font-weight:600;color:var(--hint);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;display:block}
 .form-inp{width:100%;background:var(--bg2);border:1.5px solid rgba(255,255,255,.1);border-radius:12px;padding:13px 14px;color:var(--txt);font-size:16px;outline:none;transition:border-color .2s;font-family:inherit}
 .form-inp:focus{border-color:var(--accent)}
-textarea.form-inp{min-height:110px;resize:vertical}
+textarea.form-inp{min-height:100px;resize:vertical}
+.row{display:flex;gap:8px}.row .form-inp{flex:1}
 .form-hint{font-size:12px;color:var(--hint);margin-top:5px}
-.row{display:flex;gap:8px}
-.row .form-inp{flex:1}
 .verify-btn{background:var(--bg2);border:1.5px solid rgba(255,255,255,.1);border-radius:12px;color:var(--accent);padding:13px 14px;font-size:14px;font-weight:600;cursor:pointer;white-space:nowrap}
 .verify-btn:disabled{opacity:.5}
 .msg{border-radius:12px;padding:12px 14px;font-size:14px;margin-bottom:14px}
 .msg-ok{background:rgba(52,199,89,.12);color:var(--ok)}
 .msg-err{background:rgba(255,59,48,.12);color:var(--err)}
 .msg-info{background:rgba(10,132,255,.12);color:var(--accent)}
+.msg-warn{background:rgba(255,159,10,.12);color:var(--warn)}
 .nav{display:flex;gap:10px;margin-top:20px}
 .btn-sec{flex:1;background:var(--bg2);color:var(--txt);border:1.5px solid rgba(255,255,255,.1);border-radius:var(--r);padding:13px;font-size:16px;font-weight:600;cursor:pointer}
 .btn-pri{flex:2;background:var(--accent);color:#fff;border:none;border-radius:var(--r);padding:13px;font-size:16px;font-weight:600;cursor:pointer}
-.btn-pri:disabled{opacity:.5}
-.yaml-pre{background:var(--bg2);border-radius:12px;padding:14px;font-family:'SF Mono',monospace;font-size:11px;line-height:1.6;color:#a8d8a8;white-space:pre-wrap;max-height:260px;overflow-y:auto;margin-bottom:14px}
+.btn-pri:disabled,.verify-btn:disabled{opacity:.5;cursor:default}
+.yaml-pre{background:var(--bg2);border-radius:12px;padding:14px;font-family:'SF Mono',monospace;font-size:11px;line-height:1.6;color:#a8d8a8;white-space:pre-wrap;max-height:250px;overflow-y:auto;margin-bottom:10px}
 .back-nav{background:none;border:none;color:var(--accent);font-size:15px;cursor:pointer;padding:0 0 4px;display:flex;align-items:center;gap:6px}
 .det-hdr{background:var(--bg2);border-radius:var(--r);padding:18px;margin-bottom:16px}
-.det-name{font-size:22px;font-weight:700}
-.det-tok{font-size:12px;color:var(--hint);margin-top:4px;font-family:monospace}
-.det-status{margin-top:8px}
-.action-row{display:flex;gap:10px;margin-bottom:14px}
+.det-name{font-size:22px;font-weight:700}.det-tok{font-size:12px;color:var(--hint);margin-top:4px}
+.action-row{display:flex;gap:10px;margin-bottom:12px}
 .act-btn{flex:1;border-radius:var(--r);padding:13px;font-size:15px;font-weight:600;border:none;cursor:pointer}
 .act-start{background:rgba(52,199,89,.12);color:var(--ok)}
 .act-stop{background:rgba(255,59,48,.12);color:var(--err)}
-.sec-ttl{font-size:12px;font-weight:600;color:var(--hint);text-transform:uppercase;letter-spacing:.5px;margin:18px 0 8px}
+.sec-ttl{font-size:12px;font-weight:600;color:var(--hint);text-transform:uppercase;letter-spacing:.5px;margin:16px 0 8px}
 .flows-box{background:var(--bg2);border-radius:var(--r);overflow:hidden}
 .flow-row{display:flex;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06)}
 .flow-row:last-child{border-bottom:none}
 .flow-ico{width:30px;height:30px;background:rgba(10,132,255,.12);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0}
-.flow-nm{font-size:15px;font-weight:500}
-.flow-tp{font-size:12px;color:var(--hint)}
-.del-btn{background:rgba(255,59,48,.1);color:var(--err);border:none;border-radius:var(--r);padding:13px;font-size:15px;font-weight:600;cursor:pointer;width:100%;margin-top:6px}
+.flow-nm{font-size:15px;font-weight:500}.flow-tp{font-size:12px;color:var(--hint)}
+.del-btn{background:rgba(255,59,48,.1);color:var(--err);border:none;border-radius:var(--r);padding:13px;font-size:15px;font-weight:600;cursor:pointer;width:100%;margin-top:8px}
+.ai-box{background:var(--bg2);border-radius:var(--r);padding:14px;margin-bottom:8px}
+.ai-status{font-size:13px;color:var(--hint);margin-bottom:10px}
+.tg-link{display:block;text-align:center;margin:10px 0;color:var(--accent);font-size:15px;text-decoration:none;padding:10px;background:rgba(10,132,255,.08);border-radius:12px}
+.mode-tabs{display:flex;gap:0;margin-bottom:20px;background:var(--bg2);border-radius:12px;padding:4px}
+.mode-tab{flex:1;text-align:center;padding:8px;border-radius:9px;font-size:14px;font-weight:600;cursor:pointer;color:var(--hint);border:none;background:transparent;transition:all .2s}
+.mode-tab.active{background:var(--accent);color:#fff}
+.tmpl-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
+.tmpl-card{background:var(--bg2);border-radius:var(--r);padding:14px;cursor:pointer;border:2px solid transparent;transition:all .2s;text-align:left}
+.tmpl-card:active{opacity:.8}
+.tmpl-card.selected{border-color:var(--accent);background:rgba(10,132,255,.08)}
+.tmpl-ico{font-size:28px;margin-bottom:8px}
+.tmpl-name{font-size:14px;font-weight:700;margin-bottom:4px}
+.tmpl-desc{font-size:12px;color:var(--hint);line-height:1.4}
+.tmpl-req{font-size:11px;margin-top:6px;padding:2px 7px;border-radius:20px;display:inline-block}
+.tmpl-req-none{background:rgba(52,199,89,.12);color:var(--ok)}
+.tmpl-req-ai{background:rgba(10,132,255,.12);color:var(--accent)}
+.regen-btn{background:var(--bg3);color:var(--accent);border:1.5px solid var(--accent);border-radius:12px;padding:10px 14px;font-size:14px;font-weight:600;cursor:pointer;width:100%;margin-top:8px}
+.info-box{background:var(--bg2);border-radius:12px;padding:14px;margin-bottom:14px;border-left:3px solid var(--accent)}
+.info-box p{font-size:13px;color:var(--hint);line-height:1.5}
 </style>
 </head>
 <body>
@@ -92,10 +107,13 @@ textarea.form-inp{min-height:110px;resize:vertical}
 <div id="dashboard" class="screen">
   <div class="hdr">
     <div class="hdr-left"><h1>My Bots</h1><p id="greeting">Loading...</p></div>
-    <button class="icon-btn" onclick="openSettings()" title="Settings">&#9881;</button>
+    <button class="icon-btn" onclick="openSettings()">&#9881;</button>
   </div>
   <div id="bots-list"></div>
-  <button class="fab" onclick="openWizard()">+ Create New Bot</button>
+  <div class="bottom-bar">
+    <button class="btn-tmpl" onclick="openTemplates()">&#128203; Templates</button>
+    <button class="btn-fab" onclick="openWizard(false)">+ Create Bot</button>
+  </div>
 </div>
 
 <div id="detail" class="screen">
@@ -119,7 +137,6 @@ textarea.form-inp{min-height:110px;resize:vertical}
       <div class="step-dot" id="d2"></div>
       <div class="step-dot" id="d3"></div>
     </div>
-
     <div id="s1">
       <div class="form-grp">
         <label class="form-lbl">Bot Token from @BotFather</label>
@@ -127,35 +144,65 @@ textarea.form-inp{min-height:110px;resize:vertical}
           <input class="form-inp" id="inp-token" type="text" placeholder="1234567890:ABC..." autocomplete="off" spellcheck="false">
           <button class="verify-btn" id="vfy-btn" onclick="verifyToken()">Verify</button>
         </div>
-        <div class="form-hint">Get token from @BotFather — /newbot command</div>
+        <div class="form-hint">Get token from @BotFather via /newbot command</div>
       </div>
       <div id="tok-msg"></div>
     </div>
-
     <div id="s2" style="display:none">
-      <div class="form-grp">
-        <label class="form-lbl">What should your bot do?</label>
-        <textarea class="form-inp" id="inp-desc" placeholder="Describe your bot in detail...&#10;&#10;Example: FAQ bot for our restaurant. Answers about menu, opening hours, reservations. Also takes food orders."></textarea>
-        <div class="form-hint">More detail = better result</div>
-      </div>
-      <div class="form-grp">
-        <label class="form-lbl">Anthropic API Key (for AI generation)</label>
-        <input class="form-inp" id="inp-key" type="password" placeholder="sk-ant-..." autocomplete="new-password">
-        <div class="form-hint">Optional. Without it — a ready-made template is used</div>
-      </div>
-      <div class="form-grp">
-        <label class="form-lbl">AI Key for Bot Runtime</label>
-        <div class="row">
-          <input class="form-inp" id="inp-ai-key" type="password" placeholder="sk-ant-... or sk-..." style="flex:1">
-          <select class="form-inp" id="inp-ai-prov" style="flex:0 0 110px;padding:13px 8px;font-size:14px">
-            <option value="anthropic">Anthropic</option>
-            <option value="openai">OpenAI</option>
-          </select>
+      <div id="s2-tmpl" style="display:none">
+        <div class="info-box"><p id="tmpl-info-text"></p></div>
+        <div class="form-grp">
+          <label class="form-lbl">Bot Name</label>
+          <input class="form-inp" id="inp-name-tmpl" type="text" placeholder="My Bot">
         </div>
-        <div class="form-hint">Used for AI features in your bot (translation, chat, etc.)</div>
+        <div class="form-grp">
+          <label class="form-lbl">Customize (optional)</label>
+          <textarea class="form-inp" id="inp-customize" placeholder="Describe changes: add pricing info, change language to Russian, add new service section..."></textarea>
+          <div class="form-hint">Leave empty to use the template as-is</div>
+        </div>
+        <button class="regen-btn" id="regen-btn" onclick="regenFromTemplate()" style="display:none">&#127856; Regenerate with AI</button>
+        <div id="regen-msg"></div>
+      </div>
+      <div id="s2-desc">
+        <div class="mode-tabs">
+          <button class="mode-tab active" id="tab-desc" onclick="switchMode('desc')">&#9997; Describe</button>
+          <button class="mode-tab" id="tab-pick" onclick="switchMode('pick')">&#128203; Pick Template</button>
+        </div>
+        <div id="mode-desc-content">
+          <div class="form-grp">
+            <label class="form-lbl">What should your bot do?</label>
+            <textarea class="form-inp" id="inp-desc" placeholder="Describe your bot in detail...&#10;&#10;Example: FAQ bot for our cafe. Answers about menu, hours, delivery. Takes orders."></textarea>
+            <div class="form-hint">More detail = better result</div>
+          </div>
+          <div class="form-grp">
+            <label class="form-lbl">AI Key for YAML generation (optional)</label>
+            <input class="form-inp" id="inp-key" type="password" placeholder="sk-ant-... or sk-...">
+            <div class="form-hint">Without it — ready-made template is used</div>
+          </div>
+          <div class="row">
+            <select class="form-inp" id="inp-gen-prov" style="flex:0 0 130px;padding:13px 8px;font-size:14px">
+              <option value="anthropic">Anthropic</option>
+              <option value="openai">OpenAI</option>
+            </select>
+          </div>
+        </div>
+        <div id="mode-pick-content" style="display:none">
+          <div class="tmpl-grid" id="inline-tmpl-grid"></div>
+          <div id="inline-sel-info" style="display:none" class="msg msg-info"></div>
+        </div>
+        <div class="form-grp" style="margin-top:16px">
+          <label class="form-lbl">AI Key for Bot Runtime (optional)</label>
+          <div class="row">
+            <input class="form-inp" id="inp-ai-key" type="password" placeholder="sk-ant-... or sk-..." style="flex:1">
+            <select class="form-inp" id="inp-ai-prov" style="flex:0 0 110px;padding:13px 8px;font-size:14px">
+              <option value="anthropic">Anthropic</option>
+              <option value="openai">OpenAI</option>
+            </select>
+          </div>
+          <div class="form-hint">Powers AI features in your bot (translation, chat, vision)</div>
+        </div>
       </div>
     </div>
-
     <div id="s3" style="display:none">
       <div class="form-grp">
         <label class="form-lbl">Bot Name</label>
@@ -165,9 +212,9 @@ textarea.form-inp{min-height:110px;resize:vertical}
         <label class="form-lbl">Bot Definition (YAML)</label>
         <pre class="yaml-pre" id="yaml-out">Generating...</pre>
       </div>
+      <div id="yaml-warnings" style="display:none" class="msg msg-warn"></div>
       <div id="cr-msg"></div>
     </div>
-
     <div class="nav" id="wiz-nav">
       <button class="btn-sec" id="prev-btn" style="display:none" onclick="wPrev()">Back</button>
       <button class="btn-pri" id="next-btn" onclick="wNext()">Next &#8594;</button>
@@ -175,12 +222,29 @@ textarea.form-inp{min-height:110px;resize:vertical}
   </div>
 </div>
 
+<div id="templates-overlay" class="overlay">
+  <div class="ovl-hdr">
+    <button class="close-btn" onclick="closeTemplates()">&#10005;</button>
+    <div class="ovl-title">&#128203; Bot Templates</div>
+  </div>
+  <div class="ovl-body">
+    <div class="info-box" style="margin-bottom:20px">
+      <p>Choose a ready-made template. Your bot will work instantly &#8212; just add your token and optionally an AI key.</p>
+    </div>
+    <div id="tmpl-gallery"></div>
+  </div>
+</div>
+
 <script>
 const tg = window.Telegram && window.Telegram.WebApp;
 const API = location.origin;
-let U = null, BOTS = [], WIZ = {step:1, token:'', info:null, desc:'', key:'', yaml:'', name:''};
+let U = null, BOTS = [];
+let WIZ = {step:1,token:'',info:null,desc:'',key:'',ai_key:'',ai_provider:'anthropic',gen_provider:'anthropic',yaml:'',name:'',template_id:null,is_template:false,inline_tmpl_id:null};
+let TEMPLATES_DATA = [];
 
-if(tg){tg.ready();tg.expand();var th=tg.themeParams||{};
+if(tg){
+  tg.ready(); tg.expand();
+  var th=tg.themeParams||{};
   if(th.bg_color)document.documentElement.style.setProperty('--bg',th.bg_color);
   if(th.secondary_bg_color)document.documentElement.style.setProperty('--bg2',th.secondary_bg_color);
   if(th.text_color)document.documentElement.style.setProperty('--txt',th.text_color);
@@ -196,38 +260,55 @@ async function init(){
     if(d.ok)U=d.user; else U={telegram_id:'demo',first_name:'User'};
   }catch(e){U={telegram_id:'demo',first_name:'User'};}
   await loadBots();
+  await loadTemplates();
   show('dashboard');
+  renderDash(); // BUG FIX: was missing, causing empty bot list on first load
 }
 
 async function loadBots(){
   try{
     const r=await fetch(`${API}/api/bots?user_id=${U?.telegram_id}`);
-    const d=await r.json();
-    BOTS=d.bots||[];
+    const d=await r.json(); BOTS=d.bots||[];
   }catch(e){BOTS=[];}
+}
+
+async function loadTemplates(){
+  try{
+    const r=await fetch(`${API}/api/templates`);
+    const d=await r.json(); TEMPLATES_DATA=d.templates||[];
+  }catch(e){}
 }
 
 function show(id){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.getElementById('loading').style.display='none';
-  document.getElementById('wizard').style.display='none';
+  ['wizard','templates-overlay'].forEach(o=>document.getElementById(o).style.display='none');
   document.getElementById(id).classList.add('active');
 }
 
 async function showDash(){await loadBots();renderDash();show('dashboard');}
 
 function renderDash(){
-  document.getElementById('greeting').textContent=`Hello, ${U?.first_name||'User'} \ud83d\udc4b`;
+  document.getElementById('greeting').textContent=`Hello, ${U?.first_name||'User'} \u{1F44B}`;
   const el=document.getElementById('bots-list');
   if(!BOTS.length){
-    el.innerHTML='<div class="empty"><div class="empty-ico">\ud83e\udd16</div><div class="empty-ttl">No bots yet</div><div class="empty-sub">Create your first bot\nwithout coding!</div></div>';
+    el.innerHTML='<div class="empty"><div class="empty-ico">\u{1F916}</div><div class="empty-ttl">No bots yet</div><div class="empty-sub">Create your first bot or use a template!</div></div>';
     return;
   }
   el.innerHTML=BOTS.map(b=>`
     <div class="bot-card" onclick="showDetail('${b.id}')">
-      <div class="bot-card-row">
-        <div><div class="bot-name">&#129302; ${esc(b.name)}</div><div class="bot-desc">${esc(b.description||'Custom bot')}</div></div>
-        <div class="badge badge-${b.status}">${b.status==='active'?'\u25cf Active':'\u25cb Inactive'}</div>
+      <div class="bot-row">
+        <div style="flex:1;min-width:0">
+          <div class="bot-name">\u{1F916} ${esc(b.name)}</div>
+          <div class="bot-desc">${esc(b.description||'Custom bot')}</div>
+        </div>
+        <span class="badge badge-${b.status}">${b.status==='active'?'\u25cf Active':'\u25cb Inactive'}</span>
+      </div>
+      <div class="bot-tags">
+        ${b.has_ai_key
+          ?`<span class="badge badge-ai">\u2705 AI: ${esc(b.ai_provider||'anthropic')}</span>`
+          :`<span class="badge badge-noai">\u26A0 No AI key</span>`}
+        ${b.bot_username?`<span class="badge" style="background:rgba(255,255,255,.06);color:var(--hint)">@${esc(b.bot_username)}</span>`:''}
       </div>
     </div>`).join('');
 }
@@ -238,29 +319,55 @@ function showDetail(id){
   const active=bot.status==='active';
   let flows='';
   try{
-    const p=jsyaml.load(bot.yaml_definition||'bot:\n  flows:\n    start:\n    reply: hi');
+    const p=jsyaml.load(bot.yaml_definition||'bot:\n  flows:\n    start:\n      reply: hi');
     const bc=p?.bot||p; const fl=bc?.flows||{};
     const keys=Object.keys(fl);
     if(keys.length){
-      flows='<div class="sec-ttl">Flows ('+(keys.length)+')</div><div class="flows-box">'+
-        keys.map(k=>{const f=fl[k];const t=f?.ask?'Input':f?.reply?'Reply':'Action';
-          return '<div class="flow-row"><div class="flow-ico">'+(t==='Input'?'&#128172;':'&#128228;')+'</div><div><div class="flow-nm">'+esc(k)+'</div><div class="flow-tp">'+t+' flow</div></div></div>';}).join('')+'</div>';
+      flows='<div class="sec-ttl">Flows ('+keys.length+')</div><div class="flows-box">'+
+        keys.map(k=>{const f=fl[k];
+          let tp='Reply';
+          if(f?.on_input?.call_ai||f?.on_input?.call_openai||f?.on_input?.call_anthropic)tp='AI Text';
+          else if(f?.on_input?.call_ai_vision||f?.on_input?.call_openai_vision)tp='AI Vision';
+          else if(f?.handle_photo)tp='Photo';
+          else if(f?.ask)tp='Input';
+          const ico=tp.includes('AI')?'\u{1F916}':tp==='Photo'?'\u{1F4F7}':tp==='Input'?'\u{1F4AC}':'\u{1F4E8}';
+          return `<div class="flow-row"><div class="flow-ico">${ico}</div><div><div class="flow-nm">${esc(k)}</div><div class="flow-tp">${tp} flow</div></div></div>`;
+        }).join('')+'</div>';
     }
   }catch(e){}
+  const tgLink=bot.bot_username
+    ?`<a href="https://t.me/${bot.bot_username}" target="_blank" class="tg-link">\u2197 Open @${esc(bot.bot_username)} in Telegram</a>`
+    :'';
   document.getElementById('det-content').innerHTML=`
     <div class="det-hdr">
-      <div class="det-name">&#129302; ${esc(bot.name)}</div>
-      <div class="det-tok">Created: ${new Date(bot.created_at).toLocaleDateString()}</div>
-      <div class="det-status"><span class="badge badge-${bot.status}" style="font-size:14px">${active?'\u25cf Running':'\u25cb Stopped'}</span></div>
+      <div class="det-name">\u{1F916} ${esc(bot.name)}</div>
+      <div class="det-tok">${bot.bot_username?`@${esc(bot.bot_username)} &bull; `:''} Created ${new Date(bot.created_at).toLocaleDateString()}</div>
+      <div style="margin-top:8px">
+        <span class="badge badge-${bot.status}" style="font-size:14px">${active?'\u25cf Running':'\u25cb Stopped'}</span>
+      </div>
     </div>
     <div class="action-row">
       ${active
-        ?`<button class="act-btn act-stop" onclick="deactivate('${bot.id}')">&#9209; Stop Bot</button>`
-        :`<button class="act-btn act-start" onclick="activate('${bot.id}')">&#9654; Start Bot</button>`}
+        ?`<button class="act-btn act-stop" onclick="deactivate('${bot.id}')">&#9209; Stop</button>`
+        :`<button class="act-btn act-start" onclick="activate('${bot.id}')">&#9654; Start</button>`}
     </div>
     <div id="act-msg"></div>
+    ${tgLink}
+    <div class="sec-ttl">AI Engine Key</div>
+    <div class="ai-box">
+      <div class="ai-status">${bot.has_ai_key?'\u2705 AI key configured ('+esc(bot.ai_provider||'anthropic')+')':'\u274C No AI key \u2014 add one to enable AI features'}</div>
+      <div class="row">
+        <input class="form-inp" id="ai-key-inp" type="password" placeholder="sk-ant-... or sk-..." style="flex:1">
+        <select class="form-inp" id="ai-prov-sel" style="flex:0 0 110px;padding:13px 8px;font-size:14px">
+          <option value="anthropic">Anthropic</option>
+          <option value="openai">OpenAI</option>
+        </select>
+      </div>
+      <button class="btn-sec" style="margin-top:8px;width:100%" onclick="saveAiKey('${bot.id}')">Save AI Key</button>
+    </div>
+    <div id="ai-msg"></div>
     ${flows}
-    <button class="del-btn" onclick="delBot('${bot.id}')">&#128465; Delete Bot</button><div id="ai-msg" style="margin-top:8px"></div><div class="sec-ttl" style="margin-top:12px">AI Engine Key</div><div style="background:var(--bg2);border-radius:var(--r);padding:14px;margin-bottom:10px"><div style="font-size:13px;color:var(--hint);margin-bottom:8px">${bot.has_ai_key?'\u2705 AI key set ('+esc(bot.ai_provider||'anthropic')+')':'\u274c No AI key — add to enable AI features'}</div><div class="row"><input class="form-inp" id="ai-key-inp" type="password" placeholder="sk-ant-... or sk-..." style="flex:1"><select class="form-inp" id="ai-prov-sel" style="flex:0 0 110px;padding:13px 8px;font-size:14px"><option value="anthropic">Anthropic</option><option value="openai">OpenAI</option></select></div><button class="btn-sec" style="margin-top:8px;width:100%" onclick="saveAiKey('${bot.id}')">Save AI Key</button></div>${bot.bot_username?'<a href="https://t.me/'+bot.bot_username+'" target="_blank" style="display:block;text-align:center;margin:10px 0;color:var(--accent);font-size:15px;text-decoration:none">\u2197 Open @'+esc(bot.bot_username)+' in Telegram</a>':'' }`;
+    <button class="del-btn" onclick="delBot('${bot.id}')">&#128465; Delete Bot</button>`;
   show('detail');
 }
 
@@ -268,21 +375,30 @@ async function activate(id){
   document.getElementById('act-msg').innerHTML='<div class="msg msg-info">&#8987; Starting...</div>';
   const r=await fetch(`${API}/api/bots/${id}/activate`,{method:'POST'});
   const d=await r.json();
-  if(d.ok){document.getElementById('act-msg').innerHTML='<div class="msg msg-ok">&#10003; Bot is live!</div>';await loadBots();setTimeout(()=>showDetail(id),1200);}
+  if(d.ok){document.getElementById('act-msg').innerHTML='<div class="msg msg-ok">&#10003; Bot is live 24/7!</div>';await loadBots();setTimeout(()=>showDetail(id),1500);}
   else document.getElementById('act-msg').innerHTML=`<div class="msg msg-err">&#10007; ${esc(d.error||'Error')}</div>`;
 }
 
 async function deactivate(id){
   document.getElementById('act-msg').innerHTML='<div class="msg msg-info">Stopping...</div>';
   await fetch(`${API}/api/bots/${id}/deactivate`,{method:'POST'});
-  document.getElementById('act-msg').innerHTML='<div class="msg msg-info">Stopped.</div>';
-  await loadBots();setTimeout(()=>showDetail(id),1000);
+  await loadBots(); setTimeout(()=>showDetail(id),800);
 }
 
 async function delBot(id){
   if(!confirm('Delete this bot? This cannot be undone.'))return;
   await fetch(`${API}/api/bots/${id}`,{method:'DELETE'});
   await showDash();
+}
+
+async function saveAiKey(id){
+  const k=document.getElementById('ai-key-inp').value.trim();
+  const p=document.getElementById('ai-prov-sel').value;
+  if(!k){alert('Enter an API key');return;}
+  const r=await fetch(`${API}/api/bots/${id}/ai_key`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({ai_api_key:k,ai_provider:p})});
+  const d=await r.json();
+  if(d.ok){showMsg('ai-msg','\u2705 AI key saved! Restart the bot to apply.','ok');await loadBots();setTimeout(()=>showDetail(id),1500);}
+  else showMsg('ai-msg','\u274C '+esc(d.error||'Error'),'err');
 }
 
 function openSettings(){
@@ -295,17 +411,69 @@ function openSettings(){
         <span>Name</span><span style="color:var(--hint)">${esc(U?.first_name||'—')}</span></div>
       <div style="display:flex;justify-content:space-between;padding:13px 14px">
         <span>Total bots</span><span style="color:var(--hint)">${BOTS.length}</span></div>
-    </div>`;
+    </div>
+    <div style="margin-top:20px;font-size:13px;color:var(--hint);text-align:center">BotBuilder v3.0 &bull; Railway Cloud</div>`;
   show('settings');
 }
 
-function openWizard(){
-  WIZ={step:1,token:'',info:null,desc:'',key:'',ai_key:'',ai_provider:'anthropic',yaml:'',name:''};
+// ── Templates ─────────────────────────────────────────────────────────────
+function openTemplates(){
+  renderTemplateGallery();
+  document.getElementById('templates-overlay').style.display='block';
+}
+function closeTemplates(){
+  document.getElementById('templates-overlay').style.display='none';
+}
+
+function renderTemplateGallery(){
+  if(!TEMPLATES_DATA.length){
+    document.getElementById('tmpl-gallery').innerHTML='<div class="msg msg-info">Loading templates...</div>';
+    return;
+  }
+  document.getElementById('tmpl-gallery').innerHTML=TEMPLATES_DATA.map(t=>`
+    <div style="background:var(--bg2);border-radius:var(--r);padding:16px;margin-bottom:12px;cursor:pointer;border:2px solid transparent;transition:all .2s" 
+         onclick="useTemplate('${t.id}')" id="tcard-${t.id}">
+      <div style="display:flex;align-items:flex-start;gap:14px">
+        <div style="font-size:36px;flex-shrink:0">${t.emoji||'\u{1F916}'}</div>
+        <div style="flex:1">
+          <div style="font-size:17px;font-weight:700;margin-bottom:4px">${esc(t.name)}</div>
+          <div style="font-size:13px;color:var(--hint);line-height:1.5">${esc(t.description)}</div>
+          <div style="margin-top:8px">
+            ${t.requires==='ai_key'
+              ?'<span class="badge badge-ai">\u{1F916} AI key needed</span>'
+              :'<span class="badge badge-active">\u2714 No API needed</span>'}
+          </div>
+        </div>
+        <div style="color:var(--accent);font-size:20px">&#8250;</div>
+      </div>
+    </div>`).join('');
+}
+
+async function useTemplate(tmpl_id){
+  closeTemplates();
+  const tmpl = TEMPLATES_DATA.find(t=>t.id===tmpl_id);
+  if(!tmpl) return;
+  try{
+    const r=await fetch(`${API}/api/template/${tmpl_id}`);
+    const d=await r.json();
+    if(d.ok){
+      WIZ.template_id=tmpl_id;
+      WIZ.is_template=true;
+      WIZ._tmpl_data=d.template;
+      openWizard(true);
+    }
+  }catch(e){ openWizard(true); WIZ.template_id=tmpl_id; WIZ.is_template=true; WIZ._tmpl_data=tmpl; }
+}
+
+// ── Wizard ────────────────────────────────────────────────────────────────
+function openWizard(is_template){
+  WIZ={step:1,token:'',info:null,desc:'',key:'',ai_key:'',ai_provider:'anthropic',gen_provider:'anthropic',yaml:'',name:'',template_id:WIZ.template_id||null,is_template:!!is_template,_tmpl_data:WIZ._tmpl_data||null,inline_tmpl_id:null};
   document.getElementById('inp-token').value='';
-  document.getElementById('inp-desc').value='';
-  document.getElementById('inp-key').value='';
   document.getElementById('tok-msg').innerHTML='';
   document.getElementById('cr-msg').innerHTML='';
+  if(document.getElementById('inp-desc'))document.getElementById('inp-desc').value='';
+  if(document.getElementById('inp-ai-key'))document.getElementById('inp-ai-key').value='';
+  if(document.getElementById('inp-customize'))document.getElementById('inp-customize').value='';
   updateWiz();
   document.getElementById('wizard').style.display='block';
 }
@@ -314,33 +482,123 @@ function closeWizard(){document.getElementById('wizard').style.display='none';}
 
 function updateWiz(){
   const s=WIZ.step;
-  const titles=['Create Bot','Step 1: Bot Token','Step 2: Description','Step 3: Preview & Create'];
+  const titles=['Create Bot','Step 1: Token','Step 2: Configure','Step 3: Preview & Create'];
   document.getElementById('wiz-title').textContent=titles[s];
   [1,2,3].forEach(i=>{
-    const el=document.getElementById('s'+i);
-    el.style.display=i===s?'block':'none';
+    document.getElementById('s'+i).style.display=i===s?'block':'none';
     const d=document.getElementById('d'+i);
     d.className='step-dot'+(i<s?' done':i===s?' active':'');
   });
   document.getElementById('prev-btn').style.display=s>1?'flex':'none';
   document.getElementById('next-btn').innerHTML=s===3?'&#10003; Create Bot':'Next &#8594;';
+  if(s===2){
+    if(WIZ.is_template){
+      document.getElementById('s2-tmpl').style.display='block';
+      document.getElementById('s2-desc').style.display='none';
+      const td=WIZ._tmpl_data;
+      if(td){
+        document.getElementById('tmpl-info-text').textContent=`Template: ${td.emoji||''} ${td.name}. ${td.description||''}`;
+        const ni=document.getElementById('inp-name-tmpl');
+        if(ni&&!ni.value&&td.name)ni.value=td.name;
+      }
+      const hasKey=document.getElementById('inp-ai-key')&&document.getElementById('inp-ai-key').value.trim();
+      document.getElementById('regen-btn').style.display=hasKey?'block':'none';
+    } else {
+      document.getElementById('s2-tmpl').style.display='none';
+      document.getElementById('s2-desc').style.display='block';
+    }
+  }
+}
+
+function switchMode(mode){
+  const isDesc=mode==='desc';
+  document.getElementById('tab-desc').classList.toggle('active',isDesc);
+  document.getElementById('tab-pick').classList.toggle('active',!isDesc);
+  document.getElementById('mode-desc-content').style.display=isDesc?'block':'none';
+  document.getElementById('mode-pick-content').style.display=isDesc?'none':'block';
+  if(!isDesc) renderInlineTemplates();
+}
+
+function renderInlineTemplates(){
+  const grid=document.getElementById('inline-tmpl-grid');
+  if(!TEMPLATES_DATA.length){grid.innerHTML='<div class="msg msg-info">Loading...</div>';return;}
+  grid.innerHTML=TEMPLATES_DATA.map(t=>`
+    <div class="tmpl-card ${WIZ.inline_tmpl_id===t.id?'selected':''}" onclick="selectInlineTemplate('${t.id}','${esc(t.name)}')">
+      <div class="tmpl-ico">${t.emoji||'\u{1F916}'}</div>
+      <div class="tmpl-name">${esc(t.name)}</div>
+      <div class="tmpl-desc">${esc(t.description)}</div>
+      <span class="tmpl-req ${t.requires==='ai_key'?'tmpl-req-ai':'tmpl-req-none'}">${t.requires==='ai_key'?'AI key':'Free'}</span>
+    </div>`).join('');
+}
+
+async function selectInlineTemplate(tid, tname){
+  WIZ.inline_tmpl_id=tid;
+  renderInlineTemplates();
+  document.getElementById('inline-sel-info').style.display='block';
+  document.getElementById('inline-sel-info').textContent=`\u2705 Selected: ${tname} — YAML will be used from template`;
+  try{
+    const r=await fetch(`${API}/api/template/${tid}`);
+    const d=await r.json();
+    if(d.ok){WIZ._tmpl_data=d.template;WIZ.template_id=tid;}
+  }catch(e){}
+}
+
+async function regenFromTemplate(){
+  const customText=document.getElementById('inp-customize').value.trim();
+  if(!customText){alert('Enter customization instructions first');return;}
+  const apiKey=document.getElementById('inp-ai-key').value.trim();
+  if(!apiKey){alert('Add an AI runtime key to use regeneration');return;}
+  const btn=document.getElementById('regen-btn');
+  btn.textContent='\u23f3 Regenerating...'; btn.disabled=true;
+  showMsg('regen-msg','Adapting template with AI...','info');
+  try{
+    const td=WIZ._tmpl_data;
+    const r=await fetch(API+'/api/generate',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({description:customText,api_key:apiKey,ai_provider:'anthropic',
+        bot_name:document.getElementById('inp-name-tmpl').value||td?.name||'My Bot',
+        template_yaml:td?.yaml||''})});
+    const d=await r.json();
+    if(d.ok){WIZ.yaml=d.yaml;showMsg('regen-msg','\u2705 Template adapted! Preview in next step.','ok');}
+    else showMsg('regen-msg','\u274C Generation failed: '+(d.error||'error'),'err');
+  }catch(e){showMsg('regen-msg','\u274C Error: '+e.message,'err');}
+  btn.innerHTML='\u{1F856} Regenerate with AI'; btn.disabled=false;
 }
 
 async function wNext(){
   if(WIZ.step===1){
     if(!WIZ.info){showMsg('tok-msg','Please verify your bot token first','err');return;}
-    WIZ.step=2;updateWiz();
-  }else if(WIZ.step===2){
-    const desc=document.getElementById('inp-desc').value.trim();
-    if(!desc){alert('Please describe what your bot should do');return;}
-    WIZ.desc=desc;WIZ.key=document.getElementById('inp-key').value.trim();WIZ.ai_key=document.getElementById('inp-ai-key').value.trim();WIZ.ai_provider=document.getElementById('inp-ai-prov').value;
-    WIZ.step=3;updateWiz();
-    document.getElementById('inp-name').value=WIZ.info?.first_name||'My Bot';
-    document.getElementById('yaml-out').textContent='\u23f3 Generating...';
-    document.getElementById('next-btn').disabled=true;
-    await genYaml();
-    document.getElementById('next-btn').disabled=false;
-  }else if(WIZ.step===3){
+    WIZ.step=2; updateWiz();
+  } else if(WIZ.step===2){
+    WIZ.ai_key=(document.getElementById('inp-ai-key')||{}).value?.trim()||'';
+    WIZ.ai_provider=(document.getElementById('inp-ai-prov')||{}).value||'anthropic';
+    if(WIZ.is_template){
+      const nameEl=document.getElementById('inp-name-tmpl');
+      WIZ.name=nameEl?nameEl.value.trim()||(WIZ._tmpl_data?.name||'My Bot'):(WIZ._tmpl_data?.name||'My Bot');
+      if(!WIZ.yaml&&WIZ._tmpl_data?.yaml){WIZ.yaml=WIZ._tmpl_data.yaml;}
+      WIZ.step=3; updateWiz();
+      document.getElementById('inp-name').value=WIZ.name;
+      document.getElementById('yaml-out').textContent=WIZ.yaml||'(No YAML — check template)';
+      document.getElementById('yaml-warnings').style.display='none';
+    } else {
+      if(WIZ.inline_tmpl_id&&WIZ._tmpl_data?.yaml){
+        WIZ.yaml=WIZ._tmpl_data.yaml;
+        WIZ.desc=WIZ._tmpl_data.description||'';
+      } else {
+        const desc=(document.getElementById('inp-desc')||{}).value?.trim()||'';
+        if(!desc&&!WIZ.inline_tmpl_id){alert('Please describe what your bot should do');return;}
+        WIZ.desc=desc;
+        WIZ.key=(document.getElementById('inp-key')||{}).value?.trim()||'';
+        WIZ.gen_provider=(document.getElementById('inp-gen-prov')||{}).value||'anthropic';
+      }
+      WIZ.step=3; updateWiz();
+      document.getElementById('inp-name').value=WIZ.info?.first_name||'My Bot';
+      document.getElementById('yaml-out').textContent='\u23f3 Generating...';
+      document.getElementById('yaml-warnings').style.display='none';
+      document.getElementById('next-btn').disabled=true;
+      await genYaml();
+      document.getElementById('next-btn').disabled=false;
+    }
+  } else if(WIZ.step===3){
     await createBot();
   }
 }
@@ -351,31 +609,41 @@ async function verifyToken(){
   const token=document.getElementById('inp-token').value.trim();
   if(!token){showMsg('tok-msg','Enter a token','err');return;}
   const btn=document.getElementById('vfy-btn');
-  btn.textContent='...';btn.disabled=true;
+  btn.textContent='...'; btn.disabled=true;
   try{
     const r=await fetch(`https://api.telegram.org/bot${token}/getMe`);
     const d=await r.json();
     if(d.ok){
-      WIZ.token=token;WIZ.info=d.result;
+      WIZ.token=token; WIZ.info=d.result;
       document.getElementById('tok-msg').innerHTML=`<div class="msg msg-ok">&#10003; <b>@${esc(d.result.username)}</b> verified!</div>`;
-    }else{
-      WIZ.info=null;showMsg('tok-msg','&#10007; Invalid token','err');
+    } else {
+      WIZ.info=null; showMsg('tok-msg','&#10007; Invalid token — check @BotFather','err');
     }
   }catch(e){showMsg('tok-msg','&#10007; Network error','err');}
-  btn.textContent='Verify';btn.disabled=false;
+  btn.textContent='Verify'; btn.disabled=false;
 }
 
 async function genYaml(){
+  if(WIZ.yaml){
+    document.getElementById('yaml-out').textContent=WIZ.yaml;
+    return;
+  }
   try{
     const r=await fetch(API+'/api/generate',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({description:WIZ.desc,api_key:WIZ.key,bot_name:WIZ.info?.first_name||'My Bot'})});
+      body:JSON.stringify({description:WIZ.desc,api_key:WIZ.key,ai_provider:WIZ.gen_provider,
+        bot_name:WIZ.info?.first_name||'My Bot',ai_api_key:WIZ.ai_key})});
     const d=await r.json();
     if(d.ok){
       WIZ.yaml=d.yaml;
       document.getElementById('yaml-out').textContent=d.yaml;
+      if(d.warnings&&d.warnings.length){
+        const warnEl=document.getElementById('yaml-warnings');
+        warnEl.style.display='block';
+        warnEl.textContent='\u26A0 '+d.warnings.join('; ');
+      }
       if(d.source==='template')showMsg('cr-msg','Template used (no API key). Works great!','info');
-    }else{
-      WIZ.yaml='';document.getElementById('yaml-out').textContent='Generation failed';
+    } else {
+      document.getElementById('yaml-out').textContent='Generation failed';
     }
   }catch(e){document.getElementById('yaml-out').textContent='Error: '+e.message;}
 }
@@ -386,36 +654,29 @@ async function createBot(){
   document.getElementById('next-btn').innerHTML='Creating...';
   try{
     const r=await fetch(API+'/api/bots',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({user_id:U?.telegram_id,name,description:WIZ.desc,yaml_definition:WIZ.yaml,bot_token:WIZ.token,ai_api_key:WIZ.ai_key||'',ai_provider:WIZ.ai_provider||'anthropic'})});
+      body:JSON.stringify({user_id:U?.telegram_id,name,description:WIZ.desc||WIZ._tmpl_data?.description||'',
+        yaml_definition:WIZ.yaml,bot_token:WIZ.token,ai_api_key:WIZ.ai_key,ai_provider:WIZ.ai_provider})});
     const d=await r.json();
     if(d.ok){
-      showMsg('cr-msg','&#10003; Bot created! Activating...','ok');
+      showMsg('cr-msg','\u2705 Bot created! Activating...','ok');
       const r2=await fetch(`${API}/api/bots/${d.bot_id}/activate`,{method:'POST'});
       const d2=await r2.json();
-      if(d2.ok)showMsg('cr-msg','&#128640; Bot is live and running 24/7!','ok');
-      else showMsg('cr-msg','&#10003; Created. Start manually from dashboard.','ok');
-      setTimeout(()=>{closeWizard();showDash();},2200);
-    }else{
-      showMsg('cr-msg','&#10007; '+esc(d.error||'Error'),'err');
+      if(d2.ok)showMsg('cr-msg','\u{1F680} Bot is live and running 24/7!','ok');
+      else showMsg('cr-msg','\u2705 Created! Start it from dashboard.','ok');
+      setTimeout(()=>{closeWizard();showDash();},2000);
+    } else {
+      showMsg('cr-msg','\u274C '+esc(d.error||'Error'),'err');
     }
-  }catch(e){showMsg('cr-msg','&#10007; '+e.message,'err');}
+  }catch(e){showMsg('cr-msg','\u274C '+e.message,'err');}
   document.getElementById('next-btn').disabled=false;
-  document.getElementById('next-btn').innerHTML='&#10003; Create Bot';
+  document.getElementById('next-btn').innerHTML='\u2713 Create Bot';
 }
 
-function showMsg(id,text,type){document.getElementById(id).innerHTML=`<div class="msg msg-${type}">${text}</div>`;}
+function showMsg(id,text,type){
+  const el=document.getElementById(id);
+  if(el)el.innerHTML=`<div class="msg msg-${type}">${text}</div>`;
+}
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
-
-
-async function saveAiKey(id){
-  const k=document.getElementById('ai-key-inp').value.trim();
-  const p=document.getElementById('ai-prov-sel').value;
-  if(!k){alert('Enter an API key');return;}
-  const r=await fetch(`${API}/api/bots/${id}/ai_key`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({ai_api_key:k,ai_provider:p})});
-  const d=await r.json();
-  if(d.ok){showMsg('ai-msg',chr(0x2705)+' AI key saved!','ok');await loadBots();setTimeout(()=>showDetail(id),1200);}
-  else showMsg('ai-msg',chr(0x274c)+' '+esc(d.error||'Error'),'err');
-}
 
 window.addEventListener('DOMContentLoaded',init);
 </script>
