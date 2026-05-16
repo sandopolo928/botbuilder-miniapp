@@ -1204,12 +1204,9 @@ def botbuilder_webhook():
         mu = f'{RAILWAY_URL}/app' if RAILWAY_URL else ''
         if not mu:
             _tg_send(BOTBUILDER_TOKEN, cid,
-                chr(0x1f44b) + ' Welcome to <b>BotBuilder</b>! Visit: ' + (RAILWAY_URL or 'not configured'))
-            return 'ok'
+                chr(0x1f44b) + ' Welcome to <b>BotBuilder</b>! Visit: ' + (RAILWAY_URL or 'not configured'))\nreturn 'ok'
         welcome_text = (
-            chr(0x1f44b) + ' Welcome to <b>BotBuilder</b>!
-
-'
+            chr(0x1f44b) + ' Welcome to <b>BotBuilder</b>!\n\n'
             'Create Telegram bots in minutes — no code required.
 
 '
