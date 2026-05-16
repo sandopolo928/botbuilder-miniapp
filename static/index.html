@@ -143,6 +143,17 @@ textarea.form-inp{min-height:110px;resize:vertical}
         <input class="form-inp" id="inp-key" type="password" placeholder="sk-ant-..." autocomplete="new-password">
         <div class="form-hint">Optional. Without it — a ready-made template is used</div>
       </div>
+      <div class="form-grp">
+        <label class="form-lbl">AI Key for Bot Runtime</label>
+        <div class="row">
+          <input class="form-inp" id="inp-ai-key" type="password" placeholder="sk-ant-... or sk-..." style="flex:1">
+          <select class="form-inp" id="inp-ai-prov" style="flex:0 0 110px;padding:13px 8px;font-size:14px">
+            <option value="anthropic">Anthropic</option>
+            <option value="openai">OpenAI</option>
+          </select>
+        </div>
+        <div class="form-hint">Used for AI features in your bot (translation, chat, etc.)</div>
+      </div>
     </div>
 
     <div id="s3" style="display:none">
@@ -249,7 +260,7 @@ function showDetail(id){
     </div>
     <div id="act-msg"></div>
     ${flows}
-    <button class="del-btn" onclick="delBot('${bot.id}')">&#128465; Delete Bot</button>`;
+    <button class="del-btn" onclick="delBot('${bot.id}')">&#128465; Delete Bot</button><div id="ai-msg" style="margin-top:8px"></div><div class="sec-ttl" style="margin-top:12px">AI Engine Key</div><div style="background:var(--bg2);border-radius:var(--r);padding:14px;margin-bottom:10px"><div style="font-size:13px;color:var(--hint);margin-bottom:8px">${bot.has_ai_key?'\u2705 AI key set ('+esc(bot.ai_provider||'anthropic')+')':'\u274c No AI key — add to enable AI features'}</div><div class="row"><input class="form-inp" id="ai-key-inp" type="password" placeholder="sk-ant-... or sk-..." style="flex:1"><select class="form-inp" id="ai-prov-sel" style="flex:0 0 110px;padding:13px 8px;font-size:14px"><option value="anthropic">Anthropic</option><option value="openai">OpenAI</option></select></div><button class="btn-sec" style="margin-top:8px;width:100%" onclick="saveAiKey('${bot.id}')">Save AI Key</button></div>${bot.bot_username?'<a href="https://t.me/'+bot.bot_username+'" target="_blank" style="display:block;text-align:center;margin:10px 0;color:var(--accent);font-size:15px;text-decoration:none">\u2197 Open @'+esc(bot.bot_username)+' in Telegram</a>':'' }`;
   show('detail');
 }
 
@@ -289,7 +300,7 @@ function openSettings(){
 }
 
 function openWizard(){
-  WIZ={step:1,token:'',info:null,desc:'',key:'',yaml:'',name:''};
+  WIZ={step:1,token:'',info:null,desc:'',key:'',ai_key:'',ai_provider:'anthropic',yaml:'',name:''};
   document.getElementById('inp-token').value='';
   document.getElementById('inp-desc').value='';
   document.getElementById('inp-key').value='';
@@ -312,7 +323,7 @@ function updateWiz(){
     d.className='step-dot'+(i<s?' done':i===s?' active':'');
   });
   document.getElementById('prev-btn').style.display=s>1?'flex':'none';
-  document.getElementById('next-btn').textContent=s===3?'&#10003; Create Bot':'Next &#8594;';
+  document.getElementById('next-btn').innerHTML=s===3?'&#10003; Create Bot':'Next &#8594;';
 }
 
 async function wNext(){
@@ -322,7 +333,7 @@ async function wNext(){
   }else if(WIZ.step===2){
     const desc=document.getElementById('inp-desc').value.trim();
     if(!desc){alert('Please describe what your bot should do');return;}
-    WIZ.desc=desc;WIZ.key=document.getElementById('inp-key').value.trim();
+    WIZ.desc=desc;WIZ.key=document.getElementById('inp-key').value.trim();WIZ.ai_key=document.getElementById('inp-ai-key').value.trim();WIZ.ai_provider=document.getElementById('inp-ai-prov').value;
     WIZ.step=3;updateWiz();
     document.getElementById('inp-name').value=WIZ.info?.first_name||'My Bot';
     document.getElementById('yaml-out').textContent='\u23f3 Generating...';
@@ -372,10 +383,10 @@ async function genYaml(){
 async function createBot(){
   const name=(document.getElementById('inp-name').value||WIZ.info?.first_name||'My Bot').trim();
   document.getElementById('next-btn').disabled=true;
-  document.getElementById('next-btn').textContent='Creating...';
+  document.getElementById('next-btn').innerHTML='Creating...';
   try{
     const r=await fetch(API+'/api/bots',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({user_id:U?.telegram_id,name,description:WIZ.desc,yaml_definition:WIZ.yaml,bot_token:WIZ.token})});
+      body:JSON.stringify({user_id:U?.telegram_id,name,description:WIZ.desc,yaml_definition:WIZ.yaml,bot_token:WIZ.token,ai_api_key:WIZ.ai_key||'',ai_provider:WIZ.ai_provider||'anthropic'})});
     const d=await r.json();
     if(d.ok){
       showMsg('cr-msg','&#10003; Bot created! Activating...','ok');
@@ -389,11 +400,22 @@ async function createBot(){
     }
   }catch(e){showMsg('cr-msg','&#10007; '+e.message,'err');}
   document.getElementById('next-btn').disabled=false;
-  document.getElementById('next-btn').textContent='&#10003; Create Bot';
+  document.getElementById('next-btn').innerHTML='&#10003; Create Bot';
 }
 
 function showMsg(id,text,type){document.getElementById(id).innerHTML=`<div class="msg msg-${type}">${text}</div>`;}
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+
+async function saveAiKey(id){
+  const k=document.getElementById('ai-key-inp').value.trim();
+  const p=document.getElementById('ai-prov-sel').value;
+  if(!k){alert('Enter an API key');return;}
+  const r=await fetch(`${API}/api/bots/${id}/ai_key`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({ai_api_key:k,ai_provider:p})});
+  const d=await r.json();
+  if(d.ok){showMsg('ai-msg',chr(0x2705)+' AI key saved!','ok');await loadBots();setTimeout(()=>showDetail(id),1200);}
+  else showMsg('ai-msg',chr(0x274c)+' '+esc(d.error||'Error'),'err');
+}
 
 window.addEventListener('DOMContentLoaded',init);
 </script>
