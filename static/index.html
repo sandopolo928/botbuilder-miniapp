@@ -74,6 +74,9 @@ textarea.form-inp{min-height:100px;resize:vertical}
 .flow-row:last-child{border-bottom:none}
 .flow-ico{width:30px;height:30px;background:rgba(10,132,255,.12);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0}
 .flow-nm{font-size:15px;font-weight:500}.flow-tp{font-size:12px;color:var(--hint)}
+
+.filter-btn{background:var(--bg2);border:1.5px solid rgba(255,255,255,.1);color:var(--hint);border-radius:20px;padding:6px 14px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}
+.filter-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
 .del-btn{background:rgba(255,59,48,.1);color:var(--err);border:none;border-radius:var(--r);padding:13px;font-size:15px;font-weight:600;cursor:pointer;width:100%;margin-top:8px}
 .ai-box{background:var(--bg2);border-radius:var(--r);padding:14px;margin-bottom:8px}
 .ai-status{font-size:13px;color:var(--hint);margin-bottom:10px}
@@ -231,6 +234,16 @@ textarea.form-inp{min-height:100px;resize:vertical}
     <div class="info-box" style="margin-bottom:20px">
       <p>Choose a ready-made template. Your bot will work instantly &#8212; just add your token and optionally an AI key.</p>
     </div>
+    
+    <div id="tmpl-filters" style="display:flex;gap:8px;margin-bottom:16px;overflow-x:auto;padding-bottom:4px">
+      <button class="filter-btn active" onclick="filterTemplates('')">All</button>
+      <button class="filter-btn" onclick="filterTemplates('AI')">AI</button>
+      <button class="filter-btn" onclick="filterTemplates('Business')">Business</button>
+      <button class="filter-btn" onclick="filterTemplates('Marketing')">Marketing</button>
+      <button class="filter-btn" onclick="filterTemplates('Education')">Education</button>
+      <button class="filter-btn" onclick="filterTemplates('Entertainment')">Games</button>
+      <button class="filter-btn" onclick="filterTemplates('Health')">Health</button>
+    </div>
     <div id="tmpl-gallery"></div>
   </div>
 </div>
@@ -367,7 +380,7 @@ function showDetail(id){
     </div>
     <div id="ai-msg"></div>
     ${flows}
-    <button class="del-btn" onclick="delBot('${bot.id}')">&#128465; Delete Bot</button>`;
+    <button class="del-btn" onclick="delBot('${bot.id}')">&#128465; Delete Bot</button><br><br><button class="btn-sec" style="width:100%;margin-top:6px" onclick="diagnoseBotAsync('${bot.id}')">&#128269; Diagnose &amp; Fix</button><div id="diag-result" style="margin-top:8px"></div>`;
   show('detail');
 }
 
@@ -430,7 +443,8 @@ function renderTemplateGallery(){
     document.getElementById('tmpl-gallery').innerHTML='<div class="msg msg-info">Loading templates...</div>';
     return;
   }
-  document.getElementById('tmpl-gallery').innerHTML=TEMPLATES_DATA.map(t=>`
+  const filtered=_tmplFilter?TEMPLATES_DATA.filter(t=>t.category===_tmplFilter):TEMPLATES_DATA;
+document.getElementById('tmpl-gallery').innerHTML=filtered.map(t=>`
     <div style="background:var(--bg2);border-radius:var(--r);padding:16px;margin-bottom:12px;cursor:pointer;border:2px solid transparent;transition:all .2s" 
          onclick="useTemplate('${t.id}')" id="tcard-${t.id}">
       <div style="display:flex;align-items:flex-start;gap:14px">
@@ -678,6 +692,32 @@ function showMsg(id,text,type){
 }
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
+
+let _tmplFilter='';
+function filterTemplates(cat){
+  _tmplFilter=cat;
+  document.querySelectorAll('.filter-btn').forEach(b=>b.classList.toggle('active',b.onclick.toString().includes("'"+cat+"'")));
+  renderTemplateGallery();
+}
+async function diagnoseBotAsync(id){
+  document.getElementById('diag-result').innerHTML='<div class="msg msg-info">&#8987; Running diagnostics...</div>';
+  try{
+    const r=await fetch(`${API}/api/bots/${id}/diagnose`);
+    const d=await r.json();
+    const diag=d.diagnostic||{};
+    if(diag.issues&&diag.issues.length){
+      const issueHtml=diag.issues.map(i=>`<div>&#10007; ${esc(i)}</div>`).join('');
+      document.getElementById('diag-result').innerHTML=`<div class="msg msg-err">Issues found:<br>${issueHtml}</div>`;
+      // Auto-fix webhook
+      const fixR=await fetch(`${API}/api/bots/${id}/fix_webhook`,{method:'POST'});
+      const fixD=await fixR.json();
+      if(fixD.ok){document.getElementById('diag-result').innerHTML='<div class="msg msg-ok">&#10003; Auto-fixed! Webhook re-set. Try sending /start to your bot.</div>';await loadBots();}
+      else document.getElementById('diag-result').innerHTML+=`<div class="msg msg-warn">Auto-fix result: ${esc(JSON.stringify(fixD))}</div>`;
+    } else {
+      document.getElementById('diag-result').innerHTML=`<div class="msg msg-ok">&#10003; All OK! Flows: ${esc((diag.flows||[]).join(', '))} | Pending: ${diag.pending_updates||0}</div>`;
+    }
+  }catch(e){document.getElementById('diag-result').innerHTML=`<div class="msg msg-err">&#10007; ${esc(e.message)}</div>`;}
+}
 window.addEventListener('DOMContentLoaded',init);
 </script>
 </body>
