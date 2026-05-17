@@ -514,6 +514,10 @@ async function wNext(){
       WIZ.key=WIZ.ai_key;
       const custom=(document.getElementById('inp-customize')?.value||'').trim();
       WIZ.name=(document.getElementById('inp-name-tmpl')?.value||WIZ._tmpl?.name||'My Bot').trim();
+      if(WIZ._tmpl&&WIZ._tmpl.requires==='ai_key'&&!WIZ.ai_key){
+        const _tw=document.getElementById('tmpl-warn');
+        if(_tw)_tw.innerHTML='<div class="msg msg-warn">\u26a0 This template requires an AI key to work. Enter your own Anthropic or OpenAI key above. The bot will be created but AI features will be disabled until you add a key.</div>';
+      }
       WIZ.step=3;updateWiz();
       document.getElementById('inp-name').value=WIZ.name;
       if(custom&&WIZ.ai_key){
@@ -592,13 +596,39 @@ async function genYaml(tmplYaml){
       if(d.warnings&&d.warnings.length){w.style.display='block';w.textContent='\u26a0 '+d.warnings.join('; ');}
       else w.style.display='none';
       if(d.source==='template')showMsg('cr-msg','Template used (no API key). Works great!','info');
-    }else document.getElementById('yaml-out').textContent='Failed: '+(d.error||'error');
-  }catch(e){document.getElementById('yaml-out').textContent='Error: '+e.message;}
+    }else{
+      if(WIZ._tmpl&&WIZ._tmpl.yaml){
+        WIZ.yaml=WIZ._tmpl.yaml;
+        document.getElementById('yaml-out').textContent=WIZ.yaml;
+        const _w=document.getElementById('yaml-warnings');
+        _w.style.display='block';
+        _w.textContent='\u26a0 AI error: '+(d.error||'generation failed')+'. Using base template.';
+      }else{
+        WIZ.yaml='';
+        document.getElementById('yaml-out').textContent='\u274c Failed: '+(d.error||'error');
+      }
+    }
+  }catch(e){
+    if(WIZ._tmpl&&WIZ._tmpl.yaml){
+      WIZ.yaml=WIZ._tmpl.yaml;
+      document.getElementById('yaml-out').textContent=WIZ.yaml;
+      const _w=document.getElementById('yaml-warnings');
+      _w.style.display='block';
+      _w.textContent='\u26a0 AI generation failed. Using base template.';
+    }else{
+      WIZ.yaml='';
+      document.getElementById('yaml-out').textContent='\u274c Error: '+e.message+'\n\nPlease go back and try again.';
+    }
+  }
 }
 
 async function createBot(){
   const name=(document.getElementById('inp-name').value||WIZ.info?.first_name||'My Bot').trim();
   const nb=document.getElementById('next-btn');nb.disabled=true;nb.innerHTML='Creating...';
+  if(!WIZ.yaml||WIZ.yaml.trim().length<10){
+    showMsg('cr-msg','\u26a0 Bot configuration is not ready. Please go back and regenerate.','warn');
+    nb.disabled=false;nb.innerHTML='\u2713 Create Bot';return;
+  }
   try{
     const r=await fetch(API+'/api/bots',{method:'POST',
       headers:{'Content-Type':'application/json'},
