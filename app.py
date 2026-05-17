@@ -667,7 +667,7 @@ def init_db():
 def _sanitize_yaml(yaml_str):
     """Remove unsupported DSL directives. Returns (clean_yaml, warnings)."""
     UNSUPPORTED = {'call_api', 'db_insert', 'db_query', 'db_update',
-                   'user_var_set', 'store_as', 'send_photo', 'reply_after',
+                   'send_photo', 'reply_after',
                    'if_empty_reply', 'schedule', 'conditions'}
     warnings = []
     try:
@@ -688,11 +688,10 @@ def _sanitize_yaml(yaml_str):
                     warnings.append(f"Flow '{fkey}': removed unsupported: {', '.join(removed)}")
                 for field in ['reply']:
                     v = str(oi.get(field, ''))
-                    v2 = re.sub(r'\{\{user_var:\w+\}\}', '[value]', v)
-                    v2 = re.sub(r'\{\{recall:[\w.]+\}\}', '[data]', v2)
+                    v2 = re.sub(r'\{\{recall:[\w.]+\}\}', '[data]', v)
                     if v2 != v:
                         oi[field] = v2
-                        warnings.append(f"Flow '{fkey}': replaced unsupported vars")
+                        warnings.append(f"Flow '{fkey}': replaced unsupported recall vars")
                 if oi is not None and len(oi) == 0:
                     flow['on_input'] = {'reply': chr(0x2705) + ' Got it!', 'show_menu': True}
                     warnings.append(f"Flow '{fkey}': added fallback reply (on_input was empty)")
@@ -1380,6 +1379,20 @@ def _sub_vars(text, user_input=None, ai_result=None):
     return t
 
 
+
+
+def _get_user_vars(bot_id, chat_id, user_vars_cfg):
+    result = {}
+    for key, default in (user_vars_cfg or {}).items():
+        val = _get_state(bot_id, str(chat_id), 'uvar_' + str(key))
+        result[str(key)] = val if val else str(default)
+    return result
+
+
+def _set_user_var(bot_id, chat_id, key, value):
+    _set_state(bot_id, str(chat_id), 'uvar_' + str(key), str(value))
+
+
 def _exec_on_input(token, on_input, chat_id, ai_key, ai_prov, user_text=None, photo_fid=None):
     ai_result = None
     has_ai_call = any(k in on_input for k in [
@@ -1420,7 +1433,7 @@ def _exec_on_input(token, on_input, chat_id, ai_key, ai_prov, user_text=None, ph
     return None, False, ''
 
 
-def _run_flow(bot, token, chat_id, flows, flow_key, menu, ai_key, ai_prov, user_text=None, photo_fid=None):
+def _run_flow(bot, token, chat_id, flows, flow_key, menu, ai_key, ai_prov, user_text=None, photo_fid=None, user_vars=None):
     flow = flows.get(flow_key)
     if not flow or not isinstance(flow, dict):
         print(f'[flow] Key not found: {flow_key}')
@@ -1522,7 +1535,7 @@ def _handle_yaml_bot(bot, update):
                 try:
                     on_input = json.loads(oi_str)
                     _set_state(bot_id, cid, 'waiting', '')
-                    reply, sm, nf = _exec_on_input(token, on_input, cid, ai_key, ai_prov, user_text=None, photo_fid=pfid)
+                    reply, sm, nf = _exec_on_input(token, on_input, cid, ai_key, ai_prov, user_text=None, photo_fid=pfid, user_vars=user_vars, bot_id=bot_id)
                     if reply:
                         if sm: _send_with_menu(token, cid, reply, menu)
                         else: _tg_send(token, cid, reply)
@@ -1538,7 +1551,7 @@ def _handle_yaml_bot(bot, update):
                 if isinstance(fv, dict) and fv.get('handle_photo'):
                     pf_key = fk; break
         if pf_key and pf_key in flows:
-            _run_flow(bot, token, cid, flows, pf_key, menu, ai_key, ai_prov, photo_fid=pfid); return
+            _run_flow(bot, token, cid, flows, pf_key, menu, ai_key, ai_prov, photo_fid=pfid, user_vars=user_vars); return
         if ai_key:
             img_url = _get_photo_url(token, pfid)
             if img_url:
@@ -1552,7 +1565,7 @@ def _handle_yaml_bot(bot, update):
             fk = str(item.get('flow', ''))
             if fk in flows:
                 _set_state(bot_id, cid, 'waiting', '')
-                _run_flow(bot, token, cid, flows, fk, menu, ai_key, ai_prov); return
+                _run_flow(bot, token, cid, flows, fk, menu, ai_key, ai_prov, user_vars=user_vars); return
     waiting = _get_state(bot_id, cid, 'waiting')
     if waiting:
         oi_str = _get_state(bot_id, cid, f'oi_{waiting}')
@@ -1560,7 +1573,7 @@ def _handle_yaml_bot(bot, update):
         if oi_str:
             try:
                 on_input = json.loads(oi_str)
-                reply, sm, nf = _exec_on_input(token, on_input, cid, ai_key, ai_prov, user_text=text)
+                reply, sm, nf = _exec_on_input(token, on_input, cid, ai_key, ai_prov, user_text=text, user_vars=user_vars, bot_id=bot_id)
                 if reply:
                     if sm: _send_with_menu(token, cid, reply, menu)
                     else: _tg_send(token, cid, reply)
