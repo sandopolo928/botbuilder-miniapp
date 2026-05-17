@@ -1363,7 +1363,7 @@ def _ai_vision(api_key, provider, prompt, img_url):
         return f'Vision error: {e}'
 
 
-def _sub_vars(text, user_input=None, ai_result=None):
+def _sub_vars(text, user_input=None, ai_result=None, user_vars=None):
     t = str(text)
     now = datetime.now()
     t = t.replace('{{today}}', now.strftime('%d.%m.%Y'))
@@ -1376,6 +1376,9 @@ def _sub_vars(text, user_input=None, ai_result=None):
     if ai_result is not None:
         t = t.replace('{{ai_result}}', str(ai_result))
         t = t.replace('{{result}}', str(ai_result))
+    if user_vars:
+        for _k, _v in user_vars.items():
+            t = t.replace('{{user_var:' + _k + '}}', str(_v))
     return t
 
 
@@ -1393,8 +1396,12 @@ def _set_user_var(bot_id, chat_id, key, value):
     _set_state(bot_id, str(chat_id), 'uvar_' + str(key), str(value))
 
 
-def _exec_on_input(token, on_input, chat_id, ai_key, ai_prov, user_text=None, photo_fid=None):
+def _exec_on_input(token, on_input, chat_id, ai_key, ai_prov, user_text=None, photo_fid=None, user_vars=None, bot_id=None):
     ai_result = None
+    if 'user_var_set' in on_input and user_text is not None and bot_id:
+        _set_user_var(bot_id, str(chat_id), str(on_input['user_var_set']), str(user_text))
+        if user_vars is not None:
+            user_vars[str(on_input['user_var_set'])] = str(user_text)
     has_ai_call = any(k in on_input for k in [
         'call_ai', 'call_openai', 'call_anthropic',
         'call_ai_vision', 'call_openai_vision', 'call_anthropic_vision'])
@@ -1426,7 +1433,7 @@ def _exec_on_input(token, on_input, chat_id, ai_key, ai_prov, user_text=None, ph
     if tpl:
         if ai_result and '{{ai_result}}' not in tpl and '{{result}}' not in tpl:
             tpl = tpl + '\n' + str(ai_result)
-        reply = _sub_vars(tpl, user_input=user_text, ai_result=ai_result)
+        reply = _sub_vars(tpl, user_input=user_text, ai_result=ai_result, user_vars=user_vars)
         return reply, bool(on_input.get('show_menu')), str(on_input.get('next_flow', ''))
     if ai_result:
         return str(ai_result), bool(on_input.get('show_menu')), str(on_input.get('next_flow', ''))
@@ -1455,7 +1462,7 @@ def _run_flow(bot, token, chat_id, flows, flow_key, menu, ai_key, ai_prov, user_
             _tg_send(token, chat_id, reply)
         nf = str(flow.get('next_flow', ''))
         if nf and nf in flows:
-            _run_flow(bot, token, chat_id, flows, nf, menu, ai_key, ai_prov)
+            _run_flow(bot, token, chat_id, flows, nf, menu, ai_key, ai_prov, user_vars=user_vars)
         return
     if 'ask' in flow and user_text is None and photo_fid is None:
         _tg_send(token, chat_id, flow['ask'])
@@ -1481,7 +1488,7 @@ def _run_flow(bot, token, chat_id, flows, flow_key, menu, ai_key, ai_prov, user_
             print(f'[inline_btns] {e}')
     nf = str(flow.get('next_flow', ''))
     if nf and nf in flows:
-        _run_flow(bot, token, chat_id, flows, nf, menu, ai_key, ai_prov)
+        _run_flow(bot, token, chat_id, flows, nf, menu, ai_key, ai_prov, user_vars=user_vars)
 
 
 def _handle_yaml_bot(bot, update):
@@ -1501,6 +1508,7 @@ def _handle_yaml_bot(bot, update):
         return
     flows = bc.get('flows', {}); menu = bc.get('menu', [])
     default_reply = bc.get('default_reply', 'Please use the menu.')
+    user_vars_cfg = bc.get('user_vars', {})
     if 'callback_query' in update:
         cq = update['callback_query']; cid = str(cq['message']['chat']['id'])
         fk = cq.get('data', '')
@@ -1510,13 +1518,16 @@ def _handle_yaml_bot(bot, update):
         except Exception: pass
         _set_state(bot_id, cid, 'waiting', '')
         if fk in flows:
-            _run_flow(bot, token, cid, flows, fk, menu, ai_key, ai_prov)
+            _run_flow(bot, token, cid, flows, fk, menu, ai_key, ai_prov, user_vars={})
         return
     msg = update.get('message', {})
     if not msg: return
     cid = str(msg['chat']['id']); text = msg.get('text', ''); photo = msg.get('photo')
     if text == '/start':
         _set_state(bot_id, cid, 'waiting', '')
+        for _k, _v in (user_vars_cfg or {}).items():
+            if not _get_state(bot_id, cid, 'uvar_' + str(_k)):
+                _set_state(bot_id, cid, 'uvar_' + str(_k), str(_v))
         welcome = str(bc.get('welcome', 'Welcome! ' + chr(0x1f916)))
         kb = _build_keyboard(menu)
         d = {'chat_id': cid, 'text': welcome, 'parse_mode': 'HTML'}
@@ -1526,6 +1537,7 @@ def _handle_yaml_bot(bot, update):
         return
     if text == '/help':
         _send_with_menu(token, cid, 'Use the menu buttons to interact.', menu); return
+    user_vars = _get_user_vars(bot_id, cid, user_vars_cfg)
     if photo:
         pfid = photo[-1]['file_id']
         waiting = _get_state(bot_id, cid, 'waiting')
@@ -1541,7 +1553,7 @@ def _handle_yaml_bot(bot, update):
                         else: _tg_send(token, cid, reply)
                     elif not ai_key: _send_with_menu(token, cid, chr(0x26a0) + ' Add AI key in bot settings.', menu)
                     if nf and nf in flows:
-                        _run_flow(bot, token, cid, flows, nf, menu, ai_key, ai_prov)
+                        _run_flow(bot, token, cid, flows, nf, menu, ai_key, ai_prov, user_vars=user_vars)
                     return
                 except Exception as e:
                     print(f'[photo_input] {e}'); _set_state(bot_id, cid, 'waiting', '')
@@ -1578,7 +1590,7 @@ def _handle_yaml_bot(bot, update):
                     if sm: _send_with_menu(token, cid, reply, menu)
                     else: _tg_send(token, cid, reply)
                 if nf and nf in flows:
-                    _run_flow(bot, token, cid, flows, nf, menu, ai_key, ai_prov)
+                    _run_flow(bot, token, cid, flows, nf, menu, ai_key, ai_prov, user_vars=user_vars)
                 return
             except Exception as e:
                 print(f'[text_input] {e}')
