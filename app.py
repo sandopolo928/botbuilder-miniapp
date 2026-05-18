@@ -7,7 +7,7 @@ import requests as req
 import yaml as pyyaml
 
 app = Flask(__name__, static_folder='static')
-VERSION = '4.7.0'
+VERSION = '4.8.0'
 BOTBUILDER_TOKEN = os.environ.get('BOTBUILDER_TOKEN', '')
 DATABASE_URL = os.environ.get('DATABASE_URL', '')
 RAILWAY_URL = os.environ.get('RAILWAY_URL', '')
@@ -950,6 +950,128 @@ def delete_bot(bot_id):
     return jsonify({'ok': True})
 
 
+
+def _detect_choices(desc):
+    """Detect special patterns in bot description."""
+    d = (desc or '').lower()
+    choices = []
+    lang_pats = ['choose language', 'select language', 'pick language', 'change language',
+                 'language menu', 'multilingual', 'multi-language',
+                 chr(1074)+chr(1099)+chr(1073)+chr(1086)+chr(1088)+' '+chr(1103)+chr(1079)+chr(1099)+chr(1082),
+                 chr(1087)+chr(1077)+chr(1088)+chr(1077)+chr(1074)+chr(1086)+chr(1076), 'translate']
+    if any(p in d for p in lang_pats):
+        choices.append('language_selector')
+    if any(p in d for p in ['ai', 'gpt', 'claude', 'chatgpt', chr(1085)+chr(1077)+chr(1081)+chr(1088)+chr(1086)]):
+        choices.append('has_ai')
+    return choices
+
+
+def _call_ai_generate(api_key, provider, prompt, use_sonnet=False):
+    """Call AI API to generate bot YAML. Returns raw text or None."""
+    if not api_key:
+        return None
+    try:
+        if provider in ('anthropic', 'claude'):
+            model = 'claude-sonnet-4-5' if use_sonnet else 'claude-haiku-3-5'
+            resp = req.post(
+                'https://api.anthropic.com/v1/messages',
+                headers={'x-api-key': api_key, 'anthropic-version': '2023-06-01',
+                         'content-type': 'application/json'},
+                json={'model': model, 'max_tokens': 4096,
+                      'messages': [{'role': 'user', 'content': prompt}]},
+                timeout=120
+            )
+            if resp.ok:
+                return resp.json()['content'][0]['text']
+            print(f'[ai_gen] Anthropic {resp.status_code}: {resp.text[:150]}')
+            return None
+        else:
+            resp = req.post(
+                'https://api.openai.com/v1/chat/completions',
+                headers={'Authorization': f'Bearer {api_key}', 'Content-Type': 'application/json'},
+                json={'model': 'gpt-4o', 'max_tokens': 4096, 'temperature': 0.3,
+                      'messages': [{'role': 'user', 'content': prompt}]},
+                timeout=120
+            )
+            if resp.ok:
+                return resp.json()['choices'][0]['message']['content']
+            print(f'[ai_gen] OpenAI {resp.status_code}: {resp.text[:150]}')
+            return None
+    except Exception as e:
+        print(f'[ai_gen] Exception: {e}')
+        return None
+
+
+def _clean_yaml_from_ai(raw):
+    """Extract clean YAML from AI response, stripping markdown fences."""
+    if not raw:
+        return None
+    m = re.search(r'```ya?ml\s*([\s\S]*?)```', raw, re.IGNORECASE)
+    if m:
+        return m.group(1).strip()
+    raw = raw.strip()
+    if raw.startswith('bot:'):
+        return raw
+    idx = raw.find('\nbot:')
+    if idx >= 0:
+        return raw[idx+1:].strip()
+    idx = raw.find('bot:')
+    if idx >= 0:
+        return raw[idx:].strip()
+    return raw if len(raw) > 50 else None
+
+
+def _build_smart_prompt(desc, bot_name, detected, tmpl_base=None):
+    """Build AI prompt for YAML generation."""
+    n = (bot_name or 'My Bot').strip()
+    d = (desc or 'general purpose bot').strip()
+    has_lang = 'language_selector' in (detected or [])
+
+    base_section = ''
+    if tmpl_base:
+        base_section = f'\n\nEXTEND THIS BASE TEMPLATE:\n{tmpl_base[:1200]}\n'
+
+    lang_rule = ''
+    if has_lang:
+        lang_rule = ('\n- REQUIRED: create choose_language flow with inline_buttons for'
+                     ' Russian/English/Spanish/French/Chinese')
+
+    return f"""Generate a Telegram Bot YAML for this description. Output ONLY the YAML starting with "bot:" — no markdown, no explanations.
+
+BOT NAME: {n}
+DESCRIPTION: {d}{base_section}
+
+EXACT FORMAT REQUIRED:
+bot:
+  name: "{n}"
+  platform: telegram
+  welcome: "emoji Welcome message"
+  default_reply: "Please use the menu."
+  menu:
+    - text: "emoji Button"
+      flow: flow_key
+  flows:
+    flow_key:
+      reply: "Static text response"
+      show_menu: true
+
+PATTERNS:
+AI response: on_input: {{call_ai: {{system: "You are {n}. {d}.", prompt: "{{{{input}}}}"}}, reply: "{{{{ai_result}}}}", show_menu: true}}
+User input:  ask: "Question?" then on_input with reply/call_ai
+Inline choice: inline_buttons: [{{text: "Option A", flow: flow_a}}, {{text: "Option B", flow: flow_b}}]
+Multi-step: on_input: {{reply: "Step 1 done", next_flow: step2_flow}}
+
+HARD RULES:
+1. Start with "bot:" only — NO markdown fences
+2. ALL flows listed in menu MUST exist in flows section
+3. Max 4 menu buttons
+4. Use emojis everywhere
+5. Each flow must have either reply or ask+on_input
+6. DO NOT use: call_api, db_insert, db_query, schedule{lang_rule}
+
+Create {len((detected or [])) + 3}+ flows that match the description. Generate now:"""
+
+
 @app.route('/api/generate', methods=['POST'])
 def generate_yaml():
     data = request.json or {}
@@ -963,23 +1085,30 @@ def generate_yaml():
     if not api_key:
         return jsonify({'ok': True, 'yaml': _make_simple_template(bot_name, desc, has_ai),
                         'source': 'template', 'warnings': []})
-    detected = _detect_choices(desc)
-    prompt = _build_smart_prompt(desc, bot_name, detected, tmpl_base or None)
-    raw = _call_ai_generate(api_key, provider, prompt, use_sonnet=True)
-    if not raw:
-        return jsonify({'ok': True, 'yaml': _make_simple_template(bot_name, desc, has_ai),
-                        'source': 'template', 'warnings': ['AI generation failed']})
-    yt = _clean_yaml_from_ai(raw)
-    if not yt:
-        return jsonify({'ok': True, 'yaml': _make_simple_template(bot_name, desc, has_ai),
-                        'source': 'template', 'warnings': ['Parse failed']})
-    try: pyyaml.safe_load(yt)
-    except Exception as e:
-        return jsonify({'ok': True, 'yaml': _make_simple_template(bot_name, desc, has_ai),
-                        'source': 'template', 'warnings': [f'YAML error: {e}']})
-    clean, warnings = _sanitize_yaml(yt)
-    return jsonify({'ok': True, 'yaml': clean, 'source': 'ai', 'warnings': warnings,
-                    'detected_choices': detected})
+    try:
+        detected = _detect_choices(desc)
+        prompt = _build_smart_prompt(desc, bot_name, detected, tmpl_base or None)
+        raw = _call_ai_generate(api_key, provider, prompt, use_sonnet=True)
+        if not raw:
+            return jsonify({'ok': True, 'yaml': _make_simple_template(bot_name, desc, has_ai),
+                            'source': 'template', 'warnings': ['AI generation failed']})
+        yt = _clean_yaml_from_ai(raw)
+        if not yt:
+            return jsonify({'ok': True, 'yaml': _make_simple_template(bot_name, desc, has_ai),
+                            'source': 'template', 'warnings': ['Parse failed']})
+        try: pyyaml.safe_load(yt)
+        except Exception as e:
+            return jsonify({'ok': True, 'yaml': _make_simple_template(bot_name, desc, has_ai),
+                            'source': 'template', 'warnings': [f'YAML error: {e}']})
+        clean, warnings = _sanitize_yaml(yt)
+        return jsonify({'ok': True, 'yaml': clean, 'source': 'ai', 'warnings': warnings,
+                        'detected_choices': detected})
+    except Exception as _gen_e:
+        print(f'[generate_yaml] ERROR: {_gen_e}')
+        return jsonify({'ok': True,
+                        'yaml': _make_simple_template(bot_name, desc, has_ai),
+                        'source': 'template',
+                        'warnings': [f'AI generation error: {str(_gen_e)[:100]}']})
 
 
 
