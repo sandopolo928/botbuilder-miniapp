@@ -1433,8 +1433,28 @@ def _exec_on_input(token, on_input, chat_id, ai_key, ai_prov, user_text=None, ph
         if ai_result and '{{ai_result}}' not in tpl and '{{result}}' not in tpl:
             tpl = tpl + '\n' + str(ai_result)
         reply = _sub_vars(tpl, user_input=user_text, ai_result=ai_result, user_vars=user_vars)
+        if on_input.get('inline_buttons'):
+            try:
+                _ibtns = [[{'text': b['text'], 'callback_data': b.get('flow', b['text'])}
+                            for b in on_input['inline_buttons']]]
+                req.post(f'https://api.telegram.org/bot{token}/sendMessage',
+                    json={'chat_id': chat_id, 'text': reply,
+                          'reply_markup': {'inline_keyboard': _ibtns}}, timeout=10)
+                return None, bool(on_input.get('show_menu')), str(on_input.get('next_flow', ''))
+            except Exception as _ie:
+                print(f'[ibtns] {_ie}')
         return reply, bool(on_input.get('show_menu')), str(on_input.get('next_flow', ''))
     if ai_result:
+        if on_input.get('inline_buttons'):
+            try:
+                _ibtns = [[{'text': b['text'], 'callback_data': b.get('flow', b['text'])}
+                            for b in on_input['inline_buttons']]]
+                req.post(f'https://api.telegram.org/bot{token}/sendMessage',
+                    json={'chat_id': chat_id, 'text': str(ai_result),
+                          'reply_markup': {'inline_keyboard': _ibtns}}, timeout=10)
+                return None, bool(on_input.get('show_menu')), str(on_input.get('next_flow', ''))
+            except Exception as _ie:
+                print(f'[ibtns_ai] {_ie}')
         return str(ai_result), bool(on_input.get('show_menu')), str(on_input.get('next_flow', ''))
     return None, False, ''
 
