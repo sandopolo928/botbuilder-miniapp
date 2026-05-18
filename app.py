@@ -697,8 +697,7 @@ def _sanitize_yaml(yaml_str):
                     warnings.append(f"Flow '{fkey}': added fallback reply (on_input was empty)")
             for field in ['reply']:
                 v = str(flow.get(field, ''))
-                v2 = re.sub(r'\{\{user_var:\w+\}\}', '[value]', v)
-                v2 = re.sub(r'\{\{recall:[\w.]+\}\}', '[data]', v2)
+                v2 = re.sub(r'\{\{recall:[\w.]+\}\}', '[data]', v)
                 if v2 != v:
                     flow[field] = v2
         clean = pyyaml.dump(cfg, allow_unicode=True, default_flow_style=False, indent=2)
