@@ -7,7 +7,7 @@ import requests as req
 import yaml as pyyaml
 
 app = Flask(__name__, static_folder='static')
-VERSION = '4.0.0'
+VERSION = '4.7.0'
 BOTBUILDER_TOKEN = os.environ.get('BOTBUILDER_TOKEN', '')
 DATABASE_URL = os.environ.get('DATABASE_URL', '')
 RAILWAY_URL = os.environ.get('RAILWAY_URL', '')
@@ -1465,13 +1465,24 @@ def _run_flow(bot, token, chat_id, flows, flow_key, menu, ai_key, ai_prov, user_
             _run_flow(bot, token, chat_id, flows, nf, menu, ai_key, ai_prov, user_vars=user_vars)
         return
     if 'ask' in flow and user_text is None and photo_fid is None:
-        _tg_send(token, chat_id, flow['ask'])
+        if 'inline_buttons' in flow:
+            try:
+                btns = [[{'text': b['text'], 'callback_data': b.get('flow', b['text'])}
+                         for b in flow['inline_buttons']]]
+                req.post(f'https://api.telegram.org/bot{token}/sendMessage',
+                    json={'chat_id': chat_id, 'text': flow['ask'],
+                          'reply_markup': {'inline_keyboard': btns}}, timeout=10)
+            except Exception as _e:
+                print(f'[inline_ask] {_e}')
+                _tg_send(token, chat_id, flow['ask'])
+        else:
+            _tg_send(token, chat_id, flow['ask'])
         if 'on_input' in flow:
             _set_state(bot_id, str(chat_id), f'oi_{flow_key}', json.dumps(flow['on_input']))
         _set_state(bot_id, str(chat_id), 'waiting', flow_key)
         return
     if 'reply' in flow:
-        reply = _sub_vars(str(flow['reply']), user_input=user_text)
+        reply = _sub_vars(str(flow['reply']), user_input=user_text, user_vars=user_vars)
         if flow.get('show_menu'):
             _send_with_menu(token, chat_id, reply, menu)
         else:
@@ -1528,7 +1539,8 @@ def _handle_yaml_bot(bot, update):
         for _k, _v in (user_vars_cfg or {}).items():
             if not _get_state(bot_id, cid, 'uvar_' + str(_k)):
                 _set_state(bot_id, cid, 'uvar_' + str(_k), str(_v))
-        welcome = str(bc.get('welcome', 'Welcome! ' + chr(0x1f916)))
+        welcome_vars = _get_user_vars(bot_id, cid, user_vars_cfg)
+        welcome = _sub_vars(str(bc.get('welcome', 'Welcome! ' + chr(0x1f916))), user_vars=welcome_vars)
         kb = _build_keyboard(menu)
         d = {'chat_id': cid, 'text': welcome, 'parse_mode': 'HTML'}
         if kb: d['reply_markup'] = kb
