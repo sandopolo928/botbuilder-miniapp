@@ -7,7 +7,7 @@ import requests as req
 import yaml as pyyaml
 
 app = Flask(__name__, static_folder='static')
-VERSION = '4.8.0'
+VERSION = '4.9.0'
 BOTBUILDER_TOKEN = os.environ.get('BOTBUILDER_TOKEN', '')
 DATABASE_URL = os.environ.get('DATABASE_URL', '')
 RAILWAY_URL = os.environ.get('RAILWAY_URL', '')
@@ -693,8 +693,17 @@ def _sanitize_yaml(yaml_str):
                         oi[field] = v2
                         warnings.append(f"Flow '{fkey}': replaced unsupported recall vars")
                 if oi is not None and len(oi) == 0:
-                    flow['on_input'] = {'reply': chr(0x2705) + ' Got it!', 'show_menu': True}
-                    warnings.append(f"Flow '{fkey}': added fallback reply (on_input was empty)")
+                    # If flow has 'ask' → add echo reply (user input)
+                    # If flow has no 'ask' → just show menu
+                    if flow.get('ask') or removed:
+                        flow['on_input'] = {
+                            'reply': chr(0x2705) + ' Got it! You said: {{input}}',
+                            'show_menu': True
+                        }
+                    else:
+                        del flow['on_input']
+                    if removed:
+                        warnings.append(f"Flow '{fkey}': removed unsupported ops ({', '.join(removed)}), added echo reply")
             for field in ['reply']:
                 v = str(flow.get(field, ''))
                 v2 = re.sub(r'\{\{recall:[\w.]+\}\}', '[data]', v)
@@ -823,14 +832,31 @@ def create_bot():
     conn = get_db()
     try:
         with conn.cursor() as cur:
-            cur.execute("""INSERT INTO bots
-                (id,user_id,name,description,yaml_definition,bot_token,bot_token_hash,
-                 bot_username,ai_api_key,ai_provider,status)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'inactive')
-                RETURNING id,user_id,name,description,status,bot_username,created_at""",
-                (bid, uid, name, data.get('description', ''), yaml_def, bt, th,
-                 info.get('username', ''), data.get('ai_api_key', ''),
-                 data.get('ai_provider', 'anthropic')))
+            # Check if bot with same token already exists → UPSERT
+            cur.execute("SELECT id FROM bots WHERE bot_token_hash=%s", (th,))
+            existing = cur.fetchone()
+            if existing:
+                # UPDATE existing bot (same token = update bot)
+                bid = existing["id"]
+                cur.execute(
+                    """UPDATE bots SET name=%s, description=%s, yaml_definition=%s,
+                       bot_username=%s, ai_api_key=%s, ai_provider=%s,
+                       status='inactive', updated_at=NOW()
+                       WHERE id=%s
+                       RETURNING id,user_id,name,description,status,bot_username,created_at""",
+                    (name, data.get('description', ''), yaml_def,
+                     info.get('username', ''), data.get('ai_api_key', ''),
+                     data.get('ai_provider', 'anthropic'), bid))
+            else:
+                # INSERT new bot
+                cur.execute("""INSERT INTO bots
+                    (id,user_id,name,description,yaml_definition,bot_token,bot_token_hash,
+                     bot_username,ai_api_key,ai_provider,status)
+                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'inactive')
+                    RETURNING id,user_id,name,description,status,bot_username,created_at""",
+                    (bid, uid, name, data.get('description', ''), yaml_def, bt, th,
+                     info.get('username', ''), data.get('ai_api_key', ''),
+                     data.get('ai_provider', 'anthropic')))
             bot = dict(cur.fetchone())
             bot['created_at'] = str(bot.get('created_at', ''))
         conn.commit()
