@@ -1150,6 +1150,15 @@ def _call_ai_spec(api_key, provider, desc, bot_name):
 
 
 
+
+# --- COMPAT STUBS (for add_feature fallback) ---
+def _detect_choices(d): return []
+def _build_smart_prompt(d, n, det, t=None): return d
+def _build_patch_prompt(e, d, det): return d
+def _call_ai_generate(k, p, prompt, use_sonnet=False): return None
+def _clean_yaml_from_ai(raw): return (raw or '').strip()
+
+
 @app.route('/api/generate', methods=['POST'])
 def generate_yaml():
     data = request.json or {}
@@ -1164,6 +1173,20 @@ def generate_yaml():
         return jsonify({'ok': True, 'yaml': _make_simple_template(bot_name, desc, has_ai),
                         'source': 'template', 'warnings': []})
     try:
+        # STEP 1: AI spec (no DSL knowledge needed from AI)
+        spec, spec_err = _call_ai_spec(api_key, provider, desc, bot_name)
+        if not spec:
+            return jsonify({'ok': True, 'yaml': _make_simple_template(bot_name, desc, has_ai),
+                            'source': 'template', 'warnings': ['AI spec: ' + str(spec_err)]})
+        # STEP 2: Deterministic Python builder → always valid YAML
+        yaml_out = _spec_to_yaml(spec)
+        try: pyyaml.safe_load(yaml_out)
+        except Exception as _ye:
+            return jsonify({'ok': True, 'yaml': _make_simple_template(bot_name, desc, has_ai),
+                            'source': 'template', 'warnings': ['Builder: ' + str(_ye)]})
+        clean, warnings = _sanitize_yaml(yaml_out)
+        return jsonify({'ok': True, 'yaml': clean, 'source': 'spec', 'warnings': warnings})
+        # --- DEAD CODE (stubs) ---
         detected = _detect_choices(desc)
         prompt = _build_smart_prompt(desc, bot_name, detected, tmpl_base or None)
         raw = _call_ai_generate(api_key, provider, prompt, use_sonnet=True)
@@ -1382,9 +1405,13 @@ def rebuild_bot(bot_id):
     bot = dict(bot)
     if not api_key: api_key = bot.get('ai_api_key', ''); provider = bot.get('ai_provider', 'anthropic')
     if not api_key: return jsonify({'error': 'API key required. Add it in bot settings.'}), 400
-    detected = _detect_choices(desc)
-    prompt = _build_smart_prompt(desc, bot.get('name', 'My Bot'), detected)
-    raw = _call_ai_generate(api_key, provider, prompt, use_sonnet=True)
+    # 2-step generation for rebuild
+    spec, spec_err = _call_ai_spec(api_key, provider, desc, bot.get('name', 'My Bot'))
+    if not spec:
+        return jsonify({'ok': True, 'yaml': _make_simple_template(bot.get('name', 'My Bot'), desc, True),
+                        'source': 'template', 'warnings': ['AI spec: ' + str(spec_err)]})
+    raw_yaml = _spec_to_yaml(spec)
+    raw = raw_yaml  # compat
     if not raw: return jsonify({'error': 'AI generation failed. Check your API key.'}), 500
     yt = _clean_yaml_from_ai(raw)
     if not yt: return jsonify({'error': 'Could not parse AI response'}), 500
