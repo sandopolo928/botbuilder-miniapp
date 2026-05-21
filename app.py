@@ -1164,52 +1164,36 @@ def generate_yaml():
     data = request.json or {}
     desc = (data.get('description') or '').strip()
     api_key = (data.get('api_key') or '').strip()
-    provider = data.get('ai_provider','anthropic')
+    provider = str(data.get('ai_provider', 'anthropic'))
     bot_name = (data.get('bot_name') or 'My Bot').strip()
-    tmpl_base = (data.get('template_yaml') or '').strip()
     if not desc: return jsonify({'error': 'description required'}), 400
     has_ai = bool(data.get('ai_api_key') or api_key)
     if not api_key:
         return jsonify({'ok': True, 'yaml': _make_simple_template(bot_name, desc, has_ai),
                         'source': 'template', 'warnings': []})
     try:
-        # STEP 1: AI spec (no DSL knowledge needed from AI)
+        # STEP 1: AI understands bot description → JSON spec
         spec, spec_err = _call_ai_spec(api_key, provider, desc, bot_name)
         if not spec:
+            warn = 'AI analysis failed: ' + str(spec_err) + '. Using simple template.'
             return jsonify({'ok': True, 'yaml': _make_simple_template(bot_name, desc, has_ai),
-                            'source': 'template', 'warnings': ['AI spec: ' + str(spec_err)]})
-        # STEP 2: Deterministic Python builder → always valid YAML
+                            'source': 'template', 'warnings': [warn]})
+        # STEP 2: Python deterministic builder → always valid DSL YAML
         yaml_out = _spec_to_yaml(spec)
-        try: pyyaml.safe_load(yaml_out)
+        try:
+            pyyaml.safe_load(yaml_out)
         except Exception as _ye:
             return jsonify({'ok': True, 'yaml': _make_simple_template(bot_name, desc, has_ai),
-                            'source': 'template', 'warnings': ['Builder: ' + str(_ye)]})
+                            'source': 'template', 'warnings': ['YAML build error: ' + str(_ye)]})
         clean, warnings = _sanitize_yaml(yaml_out)
         return jsonify({'ok': True, 'yaml': clean, 'source': 'spec', 'warnings': warnings})
-        # --- DEAD CODE (stubs) ---
-        detected = _detect_choices(desc)
-        prompt = _build_smart_prompt(desc, bot_name, detected, tmpl_base or None)
-        raw = _call_ai_generate(api_key, provider, prompt, use_sonnet=True)
-        if not raw:
-            return jsonify({'ok': True, 'yaml': _make_simple_template(bot_name, desc, has_ai),
-                            'source': 'template', 'warnings': ['AI generation failed']})
-        yt = _clean_yaml_from_ai(raw)
-        if not yt:
-            return jsonify({'ok': True, 'yaml': _make_simple_template(bot_name, desc, has_ai),
-                            'source': 'template', 'warnings': ['Parse failed']})
-        try: pyyaml.safe_load(yt)
-        except Exception as e:
-            return jsonify({'ok': True, 'yaml': _make_simple_template(bot_name, desc, has_ai),
-                            'source': 'template', 'warnings': [f'YAML error: {e}']})
-        clean, warnings = _sanitize_yaml(yt)
-        return jsonify({'ok': True, 'yaml': clean, 'source': 'ai', 'warnings': warnings,
-                        'detected_choices': detected})
     except Exception as _gen_e:
-        print(f'[generate_yaml] ERROR: {_gen_e}')
+        print('[generate_yaml] ERROR: ' + str(_gen_e))
+        import traceback; traceback.print_exc()
         return jsonify({'ok': True,
                         'yaml': _make_simple_template(bot_name, desc, has_ai),
                         'source': 'template',
-                        'warnings': [f'AI generation error: {str(_gen_e)[:100]}']})
+                        'warnings': ['Error: ' + str(_gen_e)[:120]]})
 
 
 
