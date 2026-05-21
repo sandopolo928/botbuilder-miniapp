@@ -1084,19 +1084,51 @@ bot:
       reply: "Static text response"
       show_menu: true
 
-PATTERNS:
-AI response: on_input: {{call_ai: {{system: "You are {n}. {d}.", prompt: "{{{{input}}}}"}}, reply: "{{{{ai_result}}}}", show_menu: true}}
-User input:  ask: "Question?" then on_input with reply/call_ai
-Inline choice: inline_buttons: [{{text: "Option A", flow: flow_a}}, {{text: "Option B", flow: flow_b}}]
-Multi-step: on_input: {{reply: "Step 1 done", next_flow: step2_flow}}
+FLOW PATTERNS:
+
+TYPE A — Static info (help, about, contacts):
+  flow_key:
+    reply: "emoji Content here"
+    show_menu: true
+  [NO on_input — just reply!]
+
+TYPE B — AI text (ask user, AI answers):
+  flow_key:
+    ask: "emoji Question?"
+    on_input:
+      call_ai:
+        system: "You are {n}. {d}."
+        prompt: "{{input}}"
+      reply: "{{ai_result}}"
+      show_menu: true
+
+TYPE C — Button choice (language, service, options):
+  flow_key:
+    ask: "emoji Choose:"
+    inline_buttons:
+      - text: "emoji Option A"
+        flow: flow_a
+      - text: "emoji Option B"
+        flow: flow_b
+  [inline_buttons goes HERE, NOT inside on_input]
+
+TYPE D — Collect input, echo back:
+  flow_key:
+    ask: "emoji Enter your text:"
+    on_input:
+      reply: "emoji Got: {{input}}"
+      show_menu: true
 
 HARD RULES:
 1. Start with "bot:" only — NO markdown fences
-2. ALL flows listed in menu MUST exist in flows section
+2. ALL flows in menu MUST exist in flows section
 3. Max 4 menu buttons
 4. Use emojis everywhere
-5. Each flow must have either reply or ask+on_input
-6. DO NOT use: call_api, db_insert, db_query, schedule{lang_rule}
+5. NEVER create on_input: {} (empty on_input)
+6. NEVER use: call_api, db_insert, db_query, schedule
+7. help/about/contacts/info → always TYPE A (reply only)
+8. choose_language/choose_service → always TYPE C (inline_buttons)
+9. EVERY flow must have content (no empty flows)
 
 Create {len((detected or [])) + 3}+ flows that match the description. Generate now:"""
 
