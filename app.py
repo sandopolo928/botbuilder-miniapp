@@ -1124,7 +1124,7 @@ HARD RULES:
 2. ALL flows in menu MUST exist in flows section
 3. Max 4 menu buttons
 4. Use emojis everywhere
-5. NEVER create on_input: {} (empty on_input)
+5. NEVER create on_input: {{}} (empty on_input)
 6. NEVER use: call_api, db_insert, db_query, schedule
 7. help/about/contacts/info → always TYPE A (reply only)
 8. choose_language/choose_service → always TYPE C (inline_buttons)
