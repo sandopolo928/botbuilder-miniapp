@@ -7,7 +7,7 @@ import requests as req
 import yaml as pyyaml
 
 app = Flask(__name__, static_folder='static')
-VERSION = '4.9.0'
+VERSION = '4.10.0'
 BOTBUILDER_TOKEN = os.environ.get('BOTBUILDER_TOKEN', '')
 DATABASE_URL = os.environ.get('DATABASE_URL', '')
 RAILWAY_URL = os.environ.get('RAILWAY_URL', '')
@@ -980,157 +980,174 @@ def delete_bot(bot_id):
 
 
 
-def _detect_choices(desc):
-    """Detect special patterns in bot description."""
-    d = (desc or '').lower()
-    choices = []
-    lang_pats = ['choose language', 'select language', 'pick language', 'change language',
-                 'language menu', 'multilingual', 'multi-language',
-                 chr(1074)+chr(1099)+chr(1073)+chr(1086)+chr(1088)+' '+chr(1103)+chr(1079)+chr(1099)+chr(1082),
-                 chr(1087)+chr(1077)+chr(1088)+chr(1077)+chr(1074)+chr(1086)+chr(1076), 'translate']
-    if any(p in d for p in lang_pats):
-        choices.append('language_selector')
-    if any(p in d for p in ['ai', 'gpt', 'claude', 'chatgpt', chr(1085)+chr(1077)+chr(1081)+chr(1088)+chr(1086)]):
-        choices.append('has_ai')
-    return choices
+
+def _spec_to_yaml(spec):
+    """Deterministic YAML builder from JSON spec. No AI. Always produces valid DSL."""
+    FLAGS = {
+        'Russian': chr(0x1f1f7)+chr(0x1f1fa), 'English': chr(0x1f1ec)+chr(0x1f1e7),
+        'Spanish': chr(0x1f1ea)+chr(0x1f1f8), 'French': chr(0x1f1eb)+chr(0x1f1f7),
+        'German': chr(0x1f1e9)+chr(0x1f1ea), 'Chinese': chr(0x1f1e8)+chr(0x1f1f3),
+        'Japanese': chr(0x1f1ef)+chr(0x1f1f5), 'Arabic': chr(0x1f1f8)+chr(0x1f1e6),
+        'Italian': chr(0x1f1ee)+chr(0x1f1f9), 'Turkish': chr(0x1f1f9)+chr(0x1f1f7),
+        'Korean': chr(0x1f1f0)+chr(0x1f1f7), 'Portuguese': chr(0x1f1e7)+chr(0x1f1f7)
+    }
+    name = spec.get('name', 'My Bot')
+    welcome = spec.get('welcome', 'Welcome to ' + name + '!')
+    default_reply = spec.get('default_reply', 'Please use the menu.')
+    user_vars_d = spec.get('user_vars', {})
+    flows_list = spec.get('flows', [])
+    menu = []; flows = {}; photo_flow_key = None
+    for fs in flows_list:
+        key = str(fs.get('key', 'flow'))
+        mtext = str(fs.get('menu_text', ''))
+        ftype = str(fs.get('type', 'static'))
+        if mtext:
+            menu.append({'text': mtext, 'flow': key})
+        if ftype == 'static':
+            flows[key] = {
+                'reply': str(fs.get('content', fs.get('reply', chr(0x1f4cc) + ' Info'))),
+                'show_menu': True
+            }
+        elif ftype == 'language_choice':
+            langs = [str(l) for l in fs.get('languages', ['Russian','English','Spanish','French','German'])[:6]]
+            lang_var = str(fs.get('var', 'lang'))
+            buttons = [{'text': FLAGS.get(l, chr(0x1f310)) + ' ' + l,
+                        'flow': 'set_lang_' + l.lower().replace(' ', '_')} for l in langs]
+            flows[key] = {'ask': chr(0x1f30d) + ' Choose your language:', 'inline_buttons': buttons}
+            for lang in langs:
+                fk = 'set_lang_' + lang.lower().replace(' ', '_')
+                flows[fk] = {
+                    'set_vars': {lang_var: lang},
+                    'reply': chr(0x2705) + ' Language: ' + FLAGS.get(lang, chr(0x1f310)) + ' ' + lang,
+                    'show_menu': True
+                }
+        elif ftype == 'vision_translate':
+            lang_var = str(fs.get('target_lang_var', 'lang'))
+            if fs.get('is_photo_flow', True): photo_flow_key = key
+            flows[key] = {
+                'ask': chr(0x1f4f7) + ' Send a photo with text to translate:',
+                'on_input': {
+                    'call_ai_vision': {
+                        'prompt': (
+                            'Extract ALL text from this image. '
+                            'Translate it to {{user_var:' + lang_var + '}}. '
+                            'Reply in this format:\n'
+                            'ORIGINAL TEXT:\n[text from image]\n\n'
+                            'TRANSLATION ({{user_var:' + lang_var + '}}):\n[translation]'
+                        )
+                    },
+                    'reply': '{{ai_result}}',
+                    'show_menu': True
+                }
+            }
+        elif ftype == 'text_translate':
+            lang_var = str(fs.get('target_lang_var', 'lang'))
+            flows[key] = {
+                'ask': chr(0x270d) + chr(0xfe0f) + ' Enter text to translate:',
+                'on_input': {
+                    'call_ai': {
+                        'system': ('Professional translator. Translate to {{user_var:' + lang_var + '}}. '
+                                   'Return ONLY the translation, no extra text.'),
+                        'prompt': '{{input}}'
+                    },
+                    'reply': '{{ai_result}}',
+                    'show_menu': True
+                }
+            }
+        elif ftype == 'ai_chat':
+            sys_p = str(fs.get('system_prompt', 'You are ' + name + '. Be helpful and friendly.'))
+            flows[key] = {
+                'ask': str(fs.get('ask', chr(0x1f4ac) + ' Ask me anything:')),
+                'on_input': {
+                    'call_ai': {'system': sys_p, 'prompt': '{{input}}'},
+                    'reply': '{{ai_result}}', 'show_menu': True
+                }
+            }
+        elif ftype == 'collect_input':
+            flows[key] = {
+                'ask': str(fs.get('ask', chr(0x270f) + ' Enter your message:')),
+                'on_input': {
+                    'reply': str(fs.get('reply', chr(0x2705) + ' Received!')),
+                    'show_menu': True
+                }
+            }
+        elif ftype == 'inline_choice':
+            opts = fs.get('options', [])
+            buttons = [{'text': str(o.get('text', '?')), 'flow': str(o.get('flow', 'help'))} for o in opts]
+            flows[key] = {'ask': str(fs.get('ask', chr(0x1f447) + ' Choose:')), 'inline_buttons': buttons}
+            for opt in opts:
+                ofk = str(opt.get('flow', ''))
+                if ofk and ofk not in flows:
+                    of = {'reply': str(opt.get('reply', chr(0x2705) + ' Selected!')), 'show_menu': True}
+                    if opt.get('set_vars'): of['set_vars'] = dict(opt['set_vars'])
+                    flows[ofk] = of
+    bot_d = {
+        'name': name, 'platform': 'telegram', 'welcome': welcome,
+        'default_reply': default_reply, 'menu': menu[:4], 'flows': flows
+    }
+    if user_vars_d: bot_d['user_vars'] = user_vars_d
+    if photo_flow_key: bot_d['photo_flow'] = photo_flow_key
+    return pyyaml.dump({'bot': bot_d}, allow_unicode=True, default_flow_style=False, indent=2)
 
 
-def _call_ai_generate(api_key, provider, prompt, use_sonnet=False):
-    """Call AI API to generate bot YAML. Returns raw text or None."""
-    if not api_key:
-        return None
+def _call_ai_spec(api_key, provider, desc, bot_name):
+    """Step 1: AI returns JSON spec. No DSL knowledge required from AI."""
+    import json as _jmod
+    prompt = (
+        'Analyze this Telegram bot. Output ONLY a valid JSON object.\n'
+        'Bot name: ' + bot_name + '\n'
+        'Description: ' + desc + '\n\n'
+        '{\n'
+        '  "name": "Bot Name with emoji",\n'
+        '  "welcome": "Welcome message",\n'
+        '  "default_reply": "Please use the menu.",\n'
+        '  "user_vars": {},\n'
+        '  "flows": [\n'
+        '    {"key": "snake_key", "menu_text": "emoji Text", "type": "TYPE", ...extras}\n'
+        '  ]\n'
+        '}\n\n'
+        'FLOW TYPES AND REQUIRED EXTRAS:\n'
+        '- "static": for help/about/contacts/info. Add: "content": "your text here"\n'
+        '- "ai_chat": AI Q&A conversation. Add: "ask": "question?", "system_prompt": "You are..."\n'
+        '- "language_choice": language picker menu. Add: "var": "lang", "languages": ["Russian","English","Spanish","French","German","Chinese"]\n'
+        '- "vision_translate": OCR+translate photo. Add: "target_lang_var": "lang", "is_photo_flow": true\n'
+        '- "text_translate": translate typed text. Add: "target_lang_var": "lang"\n'
+        '- "collect_input": collect user data. Add: "ask": "question?", "reply": "Thank you!"\n'
+        '- "inline_choice": pick from options. Add: "ask": "Choose:", "options": [{"text": "emoji A", "flow": "opt_a", "reply": "Done!"}]\n\n'
+        'RULES:\n'
+        '1. Max 4 menu flows (sub-flows not counted)\n'
+        '2. If translation + language mentioned -> add language_choice + user_vars: {"lang": "Russian"}\n'
+        '3. Photo/image translation -> vision_translate with is_photo_flow: true\n'
+        '4. Text translation -> text_translate\n'
+        '5. Always include a static help flow\n'
+        '6. Output ONLY the JSON object'
+    )
     try:
         if provider in ('anthropic', 'claude'):
-            model = 'claude-sonnet-4-5' if use_sonnet else 'claude-haiku-3-5'
-            resp = req.post(
-                'https://api.anthropic.com/v1/messages',
+            r = req.post('https://api.anthropic.com/v1/messages',
                 headers={'x-api-key': api_key, 'anthropic-version': '2023-06-01',
                          'content-type': 'application/json'},
-                json={'model': model, 'max_tokens': 4096,
+                json={'model': 'claude-sonnet-4-5', 'max_tokens': 2048,
                       'messages': [{'role': 'user', 'content': prompt}]},
-                timeout=120
-            )
-            if resp.ok:
-                return resp.json()['content'][0]['text']
-            print(f'[ai_gen] Anthropic {resp.status_code}: {resp.text[:150]}')
-            return None
+                timeout=60)
+            if not r.ok: return None, f'Anthropic {r.status_code}: {r.text[:100]}'
+            text = r.json()['content'][0]['text'].strip()
         else:
-            resp = req.post(
-                'https://api.openai.com/v1/chat/completions',
-                headers={'Authorization': f'Bearer {api_key}', 'Content-Type': 'application/json'},
-                json={'model': 'gpt-4o', 'max_tokens': 4096, 'temperature': 0.3,
+            r = req.post('https://api.openai.com/v1/chat/completions',
+                headers={'Authorization': 'Bearer ' + api_key},
+                json={'model': 'gpt-4o', 'max_tokens': 2048, 'temperature': 0.1,
+                      'response_format': {'type': 'json_object'},
                       'messages': [{'role': 'user', 'content': prompt}]},
-                timeout=120
-            )
-            if resp.ok:
-                return resp.json()['choices'][0]['message']['content']
-            print(f'[ai_gen] OpenAI {resp.status_code}: {resp.text[:150]}')
-            return None
+                timeout=60)
+            if not r.ok: return None, f'OpenAI {r.status_code}: {r.text[:100]}'
+            text = r.json()['choices'][0]['message']['content']
+        # Parse JSON — find first { to end
+        start = text.find('{')
+        if start >= 0: text = text[start:]
+        return _jmod.loads(text), None
     except Exception as e:
-        print(f'[ai_gen] Exception: {e}')
-        return None
+        return None, str(e)
 
-
-def _clean_yaml_from_ai(raw):
-    """Extract clean YAML from AI response, stripping markdown fences."""
-    if not raw:
-        return None
-    m = re.search(r'```ya?ml\s*([\s\S]*?)```', raw, re.IGNORECASE)
-    if m:
-        return m.group(1).strip()
-    raw = raw.strip()
-    if raw.startswith('bot:'):
-        return raw
-    idx = raw.find('\nbot:')
-    if idx >= 0:
-        return raw[idx+1:].strip()
-    idx = raw.find('bot:')
-    if idx >= 0:
-        return raw[idx:].strip()
-    return raw if len(raw) > 50 else None
-
-
-def _build_smart_prompt(desc, bot_name, detected, tmpl_base=None):
-    """Build AI prompt for YAML generation."""
-    n = (bot_name or 'My Bot').strip()
-    d = (desc or 'general purpose bot').strip()
-    has_lang = 'language_selector' in (detected or [])
-
-    base_section = ''
-    if tmpl_base:
-        base_section = f'\n\nEXTEND THIS BASE TEMPLATE:\n{tmpl_base[:1200]}\n'
-
-    lang_rule = ''
-    if has_lang:
-        lang_rule = ('\n- REQUIRED: create choose_language flow with inline_buttons for'
-                     ' Russian/English/Spanish/French/Chinese')
-
-    return f"""Generate a Telegram Bot YAML for this description. Output ONLY the YAML starting with "bot:" — no markdown, no explanations.
-
-BOT NAME: {n}
-DESCRIPTION: {d}{base_section}
-
-EXACT FORMAT REQUIRED:
-bot:
-  name: "{n}"
-  platform: telegram
-  welcome: "emoji Welcome message"
-  default_reply: "Please use the menu."
-  menu:
-    - text: "emoji Button"
-      flow: flow_key
-  flows:
-    flow_key:
-      reply: "Static text response"
-      show_menu: true
-
-FLOW PATTERNS:
-
-TYPE A — Static info (help, about, contacts):
-  flow_key:
-    reply: "emoji Content here"
-    show_menu: true
-  [NO on_input — just reply!]
-
-TYPE B — AI text (ask user, AI answers):
-  flow_key:
-    ask: "emoji Question?"
-    on_input:
-      call_ai:
-        system: "You are {n}. {d}."
-        prompt: "{{input}}"
-      reply: "{{ai_result}}"
-      show_menu: true
-
-TYPE C — Button choice (language, service, options):
-  flow_key:
-    ask: "emoji Choose:"
-    inline_buttons:
-      - text: "emoji Option A"
-        flow: flow_a
-      - text: "emoji Option B"
-        flow: flow_b
-  [inline_buttons goes HERE, NOT inside on_input]
-
-TYPE D — Collect input, echo back:
-  flow_key:
-    ask: "emoji Enter your text:"
-    on_input:
-      reply: "emoji Got: {{input}}"
-      show_menu: true
-
-HARD RULES:
-1. Start with "bot:" only — NO markdown fences
-2. ALL flows in menu MUST exist in flows section
-3. Max 4 menu buttons
-4. Use emojis everywhere
-5. NEVER create on_input: {{}} (empty on_input)
-6. NEVER use: call_api, db_insert, db_query, schedule
-7. help/about/contacts/info → always TYPE A (reply only)
-8. choose_language/choose_service → always TYPE C (inline_buttons)
-9. EVERY flow must have content (no empty flows)
-
-Create {len((detected or [])) + 3}+ flows that match the description. Generate now:"""
 
 
 @app.route('/api/generate', methods=['POST'])
@@ -1602,8 +1619,8 @@ def _exec_on_input(token, on_input, chat_id, ai_key, ai_prov, user_text=None, ph
             if call_key in on_input:
                 c = on_input[call_key] if isinstance(on_input[call_key], dict) else {}
                 ai_result = _ai_text(ai_key, prov,
-                    c.get('system', 'You are a helpful assistant.'),
-                    _sub_vars(c.get('prompt', '{{input}}'), user_input=user_text))
+                    _sub_vars(c.get('system', 'You are a helpful assistant.'), user_vars=user_vars),
+                    _sub_vars(c.get('prompt', '{{input}}'), user_input=user_text, user_vars=user_vars))
                 break
         if ai_result is None and '{{ai_result}}' in str(on_input.get('reply', '')):
             ai_result = _ai_text(ai_key, ai_prov, 'You are a helpful assistant.', user_text) if ai_key else chr(0x26a0) + ' AI key not configured.'
@@ -1613,10 +1630,11 @@ def _exec_on_input(token, on_input, chat_id, ai_key, ai_prov, user_text=None, ph
         for vkey, prov in [('call_ai_vision', ai_prov), ('call_openai_vision', 'openai'), ('call_anthropic_vision', 'anthropic')]:
             if vkey in on_input:
                 c = on_input[vkey] if isinstance(on_input[vkey], dict) else {}
-                ai_result = _ai_vision(ai_key, prov, c.get('prompt', 'Describe this image.'), img_url)
+                _vis_p = _sub_vars(c.get('prompt', 'Describe this image.'), user_vars=user_vars)
+                ai_result = _ai_vision(ai_key, prov, _vis_p, img_url)
                 found_vision = True; break
         if not found_vision:
-            vp = on_input.get('vision_prompt', 'Describe this image.')
+            vp = _sub_vars(on_input.get('vision_prompt', 'Describe this image.'), user_vars=user_vars)
             ai_result = _ai_vision(ai_key, ai_prov, vp, img_url) if ai_key else chr(0x26a0) + ' AI key needed for photo analysis.'
     tpl = str(on_input.get('reply', ''))
     if tpl:
@@ -1655,12 +1673,20 @@ def _run_flow(bot, token, chat_id, flows, flow_key, menu, ai_key, ai_prov, user_
         print(f'[flow] Key not found: {flow_key}')
         return
     bot_id = bot['id']
+    # set_vars: set user variables from button flow (no user input needed)
+    _sv = flow.get('set_vars', {})
+    if _sv and isinstance(_sv, dict):
+        for _svk, _svv in _sv.items():
+            _set_user_var(bot_id, str(chat_id), str(_svk), str(_svv))
+            if user_vars is not None:
+                user_vars[str(_svk)] = str(_svv)
     if photo_fid is not None and flow.get('handle_photo'):
         img_url = _get_photo_url(token, photo_fid)
         if ai_key and img_url:
             _tg_send(token, chat_id, chr(0x23f3) + ' Analyzing image...')
             c = flow.get('call_ai_vision', {})
             prompt = c.get('prompt', 'Describe this image.') if isinstance(c, dict) else 'Describe this image.'
+            prompt = _sub_vars(prompt, user_vars=user_vars)
             ai_result = _ai_vision(ai_key, ai_prov, prompt, img_url)
         else:
             ai_result = chr(0x26a0) + ' AI key not configured. Add in bot settings.'
