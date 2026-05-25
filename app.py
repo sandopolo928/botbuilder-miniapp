@@ -695,10 +695,10 @@ def _sanitize_yaml(yaml_str):
                 if oi is not None and len(oi) == 0:
                     if flow.get('inline_buttons'):
                         # Flow has inline_buttons at top level — just delete empty on_input
-                        del flow['on_input']
+                        flow.pop('on_input', None)
                     elif flow.get('reply'):
                         # Flow has top-level reply — delete empty on_input
-                        del flow['on_input']
+                        flow.pop('on_input', None)
                     elif flow.get('ask') or removed:
                         flow['on_input'] = {
                             'reply': chr(0x2705) + ' Got it! You said: {{input}}',
@@ -706,7 +706,7 @@ def _sanitize_yaml(yaml_str):
                         }
                         warnings.append(f"Flow '{fkey}': added fallback reply (on_input was empty)")
                     else:
-                        del flow['on_input']
+                        flow.pop('on_input', None)
                     if removed:
                         warnings.append(f"Flow '{fkey}': removed unsupported ops ({', '.join(removed)})")
             for field in ['reply']:
